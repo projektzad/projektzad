@@ -15,7 +15,7 @@ def login():
     if request.method == 'POST':
         session['username'] = request.form['username']
         return redirect(url_for('main.index'))
-    return render_template('login.html')
+    return "Hello World" #render_template('login.html')
 
 @main_routes.route('/logout')
 def logout():
