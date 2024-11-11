@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Strona główna</title>
+</head>
+<body>
+    <h2>Witaj, {{ username }}!</h2>
+    <p>To jest strona główna dostępna po zalogowaniu.</p>
+    <a href="{{ url_for('main.logout') }}">Wyloguj się</a>
+</body>
+</html>
