@@ -8,6 +8,9 @@ def connect_to_active_directory(ldap_server: str, username: str, password: str, 
 
         Args:
             ldap_server (str): servers IP or name
+            username (str): user's name in format of 'EXAMPLE-AD\\username' or just 'username'
+            password (str): password in plain text
+            domain (str): domain name provided as ad.example.test.local
 
         Returns:
             Tuple (bool, Connection):
@@ -20,6 +23,7 @@ def connect_to_active_directory(ldap_server: str, username: str, password: str, 
         server = Server(ldap_server, get_info=ALL)
         cu.set_users_password_from_env_variable(password=password)
 
+        username = cu.correct_username(username=username, domain=domain)
         conn = Connection(server, user=username, password=password)
 
         if conn.bind():

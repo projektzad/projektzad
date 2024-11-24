@@ -79,3 +79,22 @@ def create_distinguished_name(username: str, domain: str, organizational_unit:st
     dn = f"CN={username},CN={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
 
     return dn
+
+def correct_username(username: str, domain: str) -> str:
+    """
+        Ensures the username is in the correct format for Active Directory authentication.
+
+        Args:
+            username (str): - Can be provided as either 'username' or 'DOMAIN\\username'.
+            domain (str): - Full domain name in the format 'subdomain.domain.local'.
+
+        Returns:
+            str:
+                - If the username is already in the format 'DOMAIN\\username', it is returned unchanged.
+                - Otherwise, the domain prefix (derived from the domain) is added as 'DOMAIN\\username'.
+    """
+
+    if '\\' in username:
+        return username
+    domain_prefix = domain.split('.')[0].upper()
+    return f"{domain_prefix}\\{username}"
