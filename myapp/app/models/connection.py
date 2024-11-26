@@ -1,13 +1,12 @@
 from ldap3 import Server, Connection, ALL
 import connection_utlis as cu
 
-
 def connect_to_active_directory(ldap_server: str, username: str, password: str, domain: str) -> (bool, Connection):
     """
         Creates connection with Active Directory, user's password is saved to enviromental variable
 
         Args:
-            ldap_server (str): servers IP or name
+            ldap_server (str): server's IP or name
             username (str): user's name in format of 'EXAMPLE-AD\\username' or just 'username'
             password (str): password in plain text
             domain (str): domain name provided as ad.example.test.local
@@ -20,7 +19,7 @@ def connect_to_active_directory(ldap_server: str, username: str, password: str, 
 
     """
     if cu.validate_ldap_server(ldap_server):
-        server = Server(ldap_server, get_info=ALL)
+        server = Server(ldap_server,get_info=ALL, use_ssl=True)
         cu.set_users_password_from_env_variable(password=password)
 
         username = cu.correct_username(username=username, domain=domain)
@@ -52,4 +51,3 @@ def disconnect_from_active_directory(conn: Connection) -> bool:
         return False
 
     return True
-
