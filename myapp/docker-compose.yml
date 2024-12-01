@@ -1,0 +1,25 @@
+services:
+  container1:
+    image: ad-web-app:latest
+    ports:
+      - "3001:5000"
+
+  container2:
+    image: ad-web-app:latest
+    ports:
+      - "3002:5000"
+
+  container3:
+    image: ad-web-app:latest
+    ports:
+      - "3003:5000"
+
+  container4:
+    image: ad-web-app:latest
+    ports:
+      - "3004:5000"
+
+  container5:
+    image: ad-web-app:latest
+    ports:
+      - "3005:5000"
