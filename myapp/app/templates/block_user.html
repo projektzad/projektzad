@@ -1,0 +1,39 @@
+<!-- templates/block_user.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>Block User</h2>
+
+    <!-- Form to block user -->
+    <form method="POST" action="{{ url_for('main.toggle_block_user') }}">
+        <!-- Username Input -->
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" class="form-control" id="username" name="username" required placeholder="Enter username">
+        </div>
+
+        <!-- Organizational Unit Input -->
+        <div class="form-group">
+            <label for="organizational_unit">Organizational Unit</label>
+            <input type="text" class="form-control" id="organizational_unit" name="organizational_unit" value="Users" required placeholder="Enter OU">
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-warning">Block User</button>
+    </form>
+
+    <!-- Flash messages (success or error) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="alert alert-dismissible fade show {% for category in messages %}{% if category[0] == 'success' %}alert-success{% else %}alert-danger{% endif %}{% endfor %}" role="alert">
+                {% for category, message in messages %}
+                    <strong>{% if category == 'success' %}Success!{% else %}Error!{% endif %}</strong> {{ message }}
+                {% endfor %}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endif %}
+    {% endwith %}
+    
+{% endblock %}
