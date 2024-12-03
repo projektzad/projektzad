@@ -1,0 +1,25 @@
+services:
+  container1:
+    image: stachu420/ad-web-app:latest
+    ports:
+      - "3001:5000"
+
+  container2:
+    image: stachu420/ad-web-app:latest
+    ports:
+      - "3002:5000"
+
+  container3:
+    image: stachu420/ad-web-app:latest
+    ports:
+      - "3003:5000"
+
+  container4:
+    image: stachu420/ad-web-app:latest
+    ports:
+      - "3004:5000"
+
+  container5:
+    image: stachu420/ad-web-app:latest
+    ports:
+      - "3005:5000"
