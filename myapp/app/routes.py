@@ -16,7 +16,10 @@ from app.models.delete import delete_user_from_active_directory
 from app.models.group_modify import modify_members, get_list
 from app.models.dodawanie import add_user_to_active_directory
 
+
 main_routes = Blueprint('main', __name__)
+
+connection_global = None
 
 # Decorator requiring admin privileges
 def requires_admin(f):
@@ -34,11 +37,7 @@ def flash_error(message):
 
 # Helper function to get LDAP connection
 def get_ldap_connection():
-    connection = session.get('connection', None)
-    if not connection:
-        flash_error("Brak aktywnego połączenia LDAP.")
-        return None
-    return connection
+    return connection_global
 
 # Form validation
 def validate_form(fields):
@@ -52,6 +51,7 @@ def index():
 
 @main_routes.route('/login', methods=['GET', 'POST'])
 def login():
+    global connection_global  # Declare connection_global as global
     if request.method == 'POST':
         ldap_server = request.form['ldap_server']
         login = request.form['login']
@@ -59,12 +59,11 @@ def login():
         domain = request.form['domain']
 
         [is_connected, connection] = co.connect_to_active_directory(ldap_server, login, password, domain)
-        #is_connected = True  #todo usun 
         if is_connected:
             session['ldap_server'] = ldap_server
             session['login'] = login
             session['domain'] = domain
-            session['connection'] = connection
+            connection_global = connection  # Assign to the global variable
             return redirect(url_for('main.index'))
         else:
             return render_template('login.html', error="Błąd logowania. Proszę sprawdzić dane.")
@@ -73,30 +72,35 @@ def login():
 
 @main_routes.route('/logout')
 def logout():
-    connection = session.get('connection', None)
-    if connection:
-        co.disconnect_from_active_directory(connection)
+    global connection_global  # Declare connection_global as global
+    if connection_global:
+        co.disconnect_from_active_directory(connection_global)
+        connection_global = None  # Reset the global variable
 
     session.pop('login', None)
     session.pop('ldap_server', None)
     session.pop('domain', None)
-    session.pop('connection', None)
-
     return redirect(url_for('main.login'))
+
 
 @main_routes.route('/delete_user',  methods=['GET', 'POST'])
 def delete_user():
+    if 'login' not in session:
+        return redirect(url_for('main.login'))
     if request.method == 'POST':
         username = request.form['username']
         domain = request.form['domain']
-        connection = get_ldap_connection()
-
+        connection = connection_global
         if connection:
             try:
+                print("try")
                 success = delete_user_from_active_directory(connection, username, domain)
+                print(success)
                 if success:
+                    print("succes")
                     flash(f"Użytkownik {username} został pomyślnie usunięty.", 'success')
                 else:
+                    print("LL")
                     flash_error(f"Wystąpił błąd podczas usuwania użytkownika {username}.")
             except Exception as e:
                 flash_error(f"Wystąpił błąd: {str(e)}")
@@ -105,7 +109,55 @@ def delete_user():
     # Ensure there's a return statement for the GET method, possibly returning a template
     return render_template('delete_user.html')  # If the request method is GET, show the delete user form.
 
+def get_users_from_ad():
+    # Przykład zwracanych danych
+    return [
+        {'username': 'jdoe', 'first_name': 'John', 'last_name': 'Doe'},
+        {'username': 'asmith', 'first_name': 'Alice', 'last_name': 'Smith'},
+    ]
 
+"""
+@main_routes.route('/add_user', methods=['GET', 'POST'])
+# @requires_admin  # Zakomentowano – upewnij się, że masz odpowiednią funkcję do sprawdzania uprawnień
+def add_user():
+    if 'login' not in session:
+        return redirect(url_for('main.login'))
+
+    users = get_users_from_ad()  # Pobierz dane użytkowników
+    if request.method == 'POST':
+        selected_users = request.form.getlist('selected_users')  # Checkboxy
+
+        # Walidacja formularza
+        if not all([username, first_name, last_name, password, ou]):
+            flash_error("Wszystkie pola są wymagane.")
+            return render_template('add_user.html', users=users)
+
+        # Połącz się z LDAP
+        connection = get_ldap_connection()
+        if not connection:
+            flash_error("Nie udało się połączyć z LDAP.")
+            return redirect(url_for('main.login'))
+
+        # Dodaj użytkownika do AD
+        try:
+            success = add_user_to_active_directory(
+                connection, username, first_name, last_name, password, ou
+            )
+            if success:
+                flash(f"Użytkownik {username} został pomyślnie dodany.", "success")
+            else:
+                flash_error(f"Nie udało się dodać użytkownika {username}.")
+        except Exception as e:
+            flash_error(f"Wystąpił błąd: {str(e)}")
+        finally:
+            connection.unbind()  # Zawsze zamykaj połączenie z LDAP
+
+        return redirect(url_for('main.index'))
+
+    # Obsługa metody GET – pokaż formularz
+    return render_template('add_user.html', users=users)
+
+"""
 @main_routes.route('/add_user', methods=['GET', 'POST'])
 #@requires_admin
 def add_user():
@@ -140,6 +192,7 @@ def add_user():
         return redirect(url_for('main.index'))
 
     return render_template('add_user.html')
+
 
 @main_routes.route('/toggle_block_user', methods=['GET', 'POST'])
 def toggle_block_user():

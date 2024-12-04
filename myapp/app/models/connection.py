@@ -19,7 +19,7 @@ def connect_to_active_directory(ldap_server: str, username: str, password: str, 
 
     """
     if cu.validate_ldap_server(ldap_server):
-        server = Server(ldap_server,get_info=ALL, use_ssl=True)
+        server = Server(ldap_server,get_info=ALL, use_ssl=False)
         cu.set_users_password_from_env_variable(password=password)
 
         username = cu.correct_username(username=username, domain=domain)
