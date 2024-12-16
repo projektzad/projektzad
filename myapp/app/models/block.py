@@ -2,7 +2,6 @@ from connection_utlis import create_distinguished_name
 from ldap3 import MODIFY_REPLACE
 import csv, openpyxl
 
-
 def change_users_block_status(conn, canonical_name: str, domain: str, organizational_unit: str = "Users") -> bool:
     """
     Toggles the block status of a user in Active Directory. If the user is currently blocked,

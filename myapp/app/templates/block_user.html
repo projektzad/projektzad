@@ -1,39 +1,42 @@
-<!-- templates/block_user.html -->
 {% extends 'base.html' %}
 
 {% block content %}
-    <h2>Block User</h2>
+    <h2>Block/Unblock Users</h2>
 
-    <!-- Form to block user -->
-    <form method="POST" action="{{ url_for('main.toggle_block_user') }}">
-        <!-- Username Input -->
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" class="form-control" id="username" name="username" required placeholder="Enter username">
-        </div>
-
-        <!-- Organizational Unit Input -->
-        <div class="form-group">
-            <label for="organizational_unit">Organizational Unit</label>
-            <input type="text" class="form-control" id="organizational_unit" name="organizational_unit" value="Users" required placeholder="Enter OU">
-        </div>
-
-        <!-- Submit Button -->
-        <button type="submit" class="btn btn-warning">Block User</button>
+    <!-- Form for selecting users to block/unblock -->
+    <form method="post">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Username</th>
+                    <th>Domain</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        <!-- Checkbox for selecting users -->
+                        <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.dn }}">
+                    </td>
+                    <td>{{ user.cn }}</td>
+                    <td>{{ user.dn }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-danger">Toggle Block Status</button>
     </form>
 
-    <!-- Flash messages (success or error) -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="alert alert-dismissible fade show {% for category in messages %}{% if category[0] == 'success' %}alert-success{% else %}alert-danger{% endif %}{% endfor %}" role="alert">
-                {% for category, message in messages %}
-                    <strong>{% if category == 'success' %}Success!{% else %}Error!{% endif %}</strong> {{ message }}
-                {% endfor %}
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-        {% endif %}
-    {% endwith %}
-    
+    <hr>
+
+    <!-- File upload section for blocking/unblocking users -->
+    <h3>Or block/unblock users via file upload</h3>
+    <form method="post" enctype="multipart/form-data">
+        <label for="file">Upload CSV or Excel File:</label>
+        <input type="file" name="file" id="file" required>
+        <button type="submit" class="btn btn-danger">Block/Unblock Users from File</button>
+    </form>
+
 {% endblock %}

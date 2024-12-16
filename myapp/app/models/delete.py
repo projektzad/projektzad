@@ -14,6 +14,7 @@ def delete_user_from_active_directory(conn, username: str, domain: str) -> bool:
         bool: Returns True if the user was successfully deleted, False otherwise.
     """
     user_dn = cu.create_distinguished_name(username, domain)
+    print("User DNNN:",user_dn)
     try:
         conn.delete(user_dn)
         return conn.result['result'] == 0  # Returns True if successful, False otherwise
