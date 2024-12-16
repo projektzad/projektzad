@@ -62,22 +62,36 @@ def get_users_password_from_env_variable(env_variable_name: str) -> (bool, str):
     except Exception:
         return (False, "")
 
-def create_distinguished_name(username: str, domain: str, organizational_unit:str ="Users") -> str:
+def create_distinguished_name(username: str, domain: str, organizational_unit: str = "Users") -> str:
     """
-        Combines arguments into distinguished name (necessery to authenticate to Actve Directory)
+    Combines arguments into a distinguished name (necessary to authenticate to Active Directory).
+    Supports nested Organizational Units (OUs) separated by '/'.
 
-        Args:
-            username (str): 
-            domain (str): provided as:         subdomain.domain.local
-            organizational_unit (str): OU where the User is located. Default = Users
-        Returns:
-            bool:
-                - if format is correct returns: True
-                - otherwise: False
+    Args:
+        username (str): The username of the user.
+        domain (str): The domain in the format: subdomain.domain.local (e.g., "example.domain.local").
+        organizational_unit (str): The organizational unit (OU) where the user is located.
+                                   Can be a single OU (e.g., "Users") or multiple nested OUs separated by '/' 
+                                   (e.g., "OU=testOU/nestedOU1/nestedOU2").
+                                   Default is "Users".
+
+    Returns:
+        str: The distinguished name (DN) in the format:
+             "CN=username,OU=organizational_unit1,OU=organizational_unit2,...,DC=subdomain,DC=domain,DC=local".
     """
     domain_parts = domain.split(".")
-    dn = f"CN={username},CN={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
-
+    
+    if "/" in organizational_unit:
+        ou_parts = organizational_unit.split("/")
+        ou_parts.reverse()
+        ou_dn = ",".join([f"OU={ou}" for ou in ou_parts])
+        dn = f"CN={username},{ou_dn}," + ",".join([f"DC={part}" for part in domain_parts])
+    else:
+        if organizational_unit == "Users":
+            dn = f"CN={username},CN={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
+        else:
+            dn = f"CN={username},OU={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
+    
     return dn
 
 def correct_username(username: str, domain: str) -> str:
