@@ -35,7 +35,7 @@ def parse_user_data(user_data):
     domain = ".".join(part.split('=')[1] for part in domain_parts) if domain_parts else None
     
     # Join the organizational units with a dot
-    ou = "".join(part.split('=')[1] for part in ou_parts) if ou_parts else None
+    ou = "/".join(part.split('=')[1] for part in reversed(ou_parts)) if ou_parts else None
     cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
 
     return ou, domain, cn

@@ -1,1 +1,2 @@
-test test,CN=test test,CN=Users,DC=testad,DC=local
+canonical_name,domain,organizational_unit
+Maciej Smialowski,testad.local,testoweou
