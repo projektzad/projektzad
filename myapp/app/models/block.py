@@ -91,7 +91,7 @@ def block_multiple_users(conn, file_path: str) -> int:
     return processed_count
 
 
-def csv_blocking(file_path: str) -> int:
+def csv_blocking(conn, file_path: str) -> int:
     """
     Processes a CSV file to change the block status of users listed in the file.
 
@@ -115,7 +115,7 @@ def csv_blocking(file_path: str) -> int:
 
     return processed_count
 
-def excel_blocking(file_path: str)-> int:
+def excel_blocking(conn, file_path: str)-> int:
     """
     Processes an Excel (XLSX) file to change the block status of users listed in the file.
 

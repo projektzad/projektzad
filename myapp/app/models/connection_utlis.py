@@ -15,8 +15,8 @@ def validate_ldap_server(ldap_server: str) -> bool:
     """
 
     pattern = r"^ldap://((?:[a-zA-Z0-9.-]+)|(?:\d{1,3}\.){3}\d{1,3})(:[0-9]+)?$"
-    
-    if re.match(pattern, ldap_server):
+    secure_pattern = r"^ldaps://((?:[a-zA-Z0-9.-]+)|(?:\d{1,3}\.){3}\d{1,3})(:[0-9]+)?$"
+    if re.match(pattern, ldap_server) or re.match(secure_pattern, ldap_server):
         return True
     else:
         return False
