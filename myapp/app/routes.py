@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from functools import wraps
+from werkzeug.utils import secure_filename
 import sys
 import os
-from flask import current_app
+
 
 # Get the absolute path to the 'models' directory
 models_path = os.path.join(os.path.dirname(__file__), 'models')
@@ -17,8 +18,8 @@ from app.models.delete import delete_user_from_active_directory
 from app.models.group_modify import modify_members, get_list
 from app.models.dodawanie import add_user_to_active_directory
 from app.models.all_users import get_all_users
-from app.models.batch_delete_users import csv_deletion,excel_deletion
-from app.models.block import excel_blocking, csv_blocking
+from app.models.batch_delete_users import delete_multiple_users
+from app.models.block import block_multiple_users
 
 main_routes = Blueprint('main', __name__)
 
@@ -29,14 +30,15 @@ def parse_user_data(user_data):
     # Wydzielenie domeny (wszystkie DC=...) oraz OU=...
     domain_parts = re.findall(r"DC=[^,]+", user_data)
     ou_parts = re.findall(r"OU=[^,]+", user_data)
-    
+    cn_parts =  re.findall(r"CN=[^,]+", user_data)
     # Join the domain parts with a dot
     domain = ".".join(part.split('=')[1] for part in domain_parts) if domain_parts else None
     
     # Join the organizational units with a dot
-    ou = ".".join(part.split('=')[1] for part in ou_parts) if ou_parts else None
+    ou = "".join(part.split('=')[1] for part in ou_parts) if ou_parts else None
+    cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
 
-    return ou, domain
+    return ou, domain, cn
 
 
 # Decorator requiring admin privileges
@@ -100,8 +102,7 @@ def logout():
     session.pop('ldap_server', None)
     session.pop('domain', None)
     return redirect(url_for('main.login'))
-from flask import request, redirect, url_for, flash
-import os
+
 
 @main_routes.route('/delete_user', methods=['GET', 'POST'])
 def delete_user():
@@ -124,8 +125,12 @@ def delete_user():
             for user_data in selected_users:
                 try:
                     username, domain = user_data.split('|')
-                    ou,domain = parse_user_data(domain)
-                    success = delete_user_from_active_directory(connection, username, domain)
+                    ou,domain,cn = parse_user_data(domain)
+                    if ou:
+                        success = delete_user_from_active_directory(connection, username, domain, ou)
+                    else:
+                        success = delete_user_from_active_directory(connection, username, domain)
+                    
                     if success:
                         successes.append(username)
                     else:
@@ -150,10 +155,8 @@ def delete_user():
 
             # Process file based on type (Excel or CSV)
             try:
-                if file.filename.endswith('.xlsx'):
-                    deleted_count = excel_deletion(file_path, connection)
-                elif file.filename.endswith('.csv'):
-                    deleted_count = csv_deletion(file_path, connection)
+                if (file.filename.endswith('.xlsx') or file.filename.endswith('.csv')) :
+                    deleted_count = delete_multiple_users(connection,file_path)
                 else:
                     flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
                     return redirect(url_for('main.delete_user'))
@@ -360,8 +363,13 @@ def toggle_block_user():
             for user_data in selected_users:
                 try:
                     username, domain = user_data.split('|')
-                    ou, domain = parse_user_data(domain)
-                    success = change_users_block_status(connection, username, domain, ou)
+                    ou, domain,cn = parse_user_data(domain)
+                    print(ou)
+                    if ou:
+                        success = change_users_block_status(connection, username, domain, ou)
+                    else:
+                        # Jeśli OU jest puste, przekazujemy tylko username i domain
+                        success = change_users_block_status(connection, username, domain)
                     if success:
                         successes.append(username)
                     else:
@@ -388,10 +396,8 @@ def toggle_block_user():
 
             # Process file based on type (Excel or CSV)
             try:
-                if file.filename.endswith('.xlsx'):
-                    blocked_count = excel_blocking(file_path, connection)  
-                elif file.filename.endswith('.csv'):
-                    blocked_count = csv_blocking(file_path, connection) 
+                if (file.filename.endswith('.xlsx') or file.filename.endswith('.csv')) :
+                    blocked_count = block_multiple_users(connection,file_path)
                 else:
                     flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
                     return redirect(url_for('main.toggle_block_user'))
