@@ -20,7 +20,7 @@
                         <!-- Checkbox for selecting users -->
                         <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.distinguishedName }}">
                     </td>
-                    <td>{{ user.cn }}</td>
+                    <td>{{ user.name }}</td>
                     <td>{{ user.distinguishedName }}</td>
                     <td>
                         <!-- Wyświetlanie atrybutów w formacie "nazwa_atrybutu: wartość" -->
@@ -31,7 +31,7 @@
                             <div id="attributes-{{ user.cn }}" class="collapse">
                                 <ul>
                                     {% for key, value in user.items() %}
-                                        {% if key != 'cn' and key != 'dn' %}
+                                    {% if key != 'name' and key != 'distinguishedName' %}
                                             <li><strong>{{ key }}:</strong> {{ value }}</li>
                                         {% endif %}
                                     {% endfor %}

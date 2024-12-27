@@ -18,6 +18,30 @@
             </div>
         </div>
 
+        <!-- Buttons to select or deselect all checkboxes -->
+        <div class="form-group">
+            <button type="button" class="btn btn-secondary" onclick="selectAll()">Select All</button>
+            <button type="button" class="btn btn-secondary" onclick="deselectAll()">Deselect All</button>
+        </div>
+
         <button type="submit" class="btn btn-primary">Submit</button>
     </form>
+
+    <script>
+        // Function to select all checkboxes
+        function selectAll() {
+            var checkboxes = document.querySelectorAll('input[name="selected_options"]');
+            checkboxes.forEach(function(checkbox) {
+                checkbox.checked = true;
+            });
+        }
+
+        // Function to deselect all checkboxes
+        function deselectAll() {
+            var checkboxes = document.querySelectorAll('input[name="selected_options"]');
+            checkboxes.forEach(function(checkbox) {
+                checkbox.checked = false;
+            });
+        }
+    </script>
 {% endblock %}

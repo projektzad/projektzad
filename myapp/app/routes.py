@@ -16,11 +16,11 @@ from app.models import connection as co
 from app.models.block import change_users_block_status
 from app.models.delete import delete_user_from_active_directory
 from app.models.group_modify import modify_members, get_list
-from app.models.dodawanie import add_user_to_active_directory
 from app.models.all_users import get_all_users
 from app.models.batch_delete_users import delete_multiple_users
 from app.models.block import block_multiple_users
 from app.models.expire import expire_multiple_users,set_account_expiration
+from app.models.add import create_user
 main_routes = Blueprint('main', __name__)
 
 connection_global = None
@@ -85,7 +85,6 @@ def checkbox_form():
     'uSNCreated',
     'userPrincipalName',
     'userAccountControl',
-    'sn',
     'sAMAccountType',
     'pwdLastSet',
     'primaryGroupID',
@@ -93,16 +92,15 @@ def checkbox_form():
     'objectClass',
     'objectGUID',
     'objectSid',
-    'name',
+    'cn',
     'logonCount',
     'instanceType',
     'givenName',
     'dSCorePropagationData',
-    'distinguishedName',
     'displayName',
     'countryCode',
     'codePage',
-    'cn',
+    'sn',
     'badPwdCount',
     'badPasswordTime',
     'accountExpires'
@@ -110,13 +108,15 @@ def checkbox_form():
   # All options
     if request.method == 'POST':
         selected = request.form.getlist('selected_options')
+        selected.append("name")
+        selected.append("distinguishedName")
         flash(f'You selected: {", ".join(selected)}', 'success')
         # Save selected options in session
         session['options'] = selected
         return redirect(url_for('main.checkbox_form'))
     else:
         # Retrieve selected options from session if available
-        preselected_options = session.get('options', ['Option 1'])
+        preselected_options = session.get('options',  ['name', 'distinguishedName'])
     return render_template('checkbox.html', options=options, preselected_options=preselected_options)
 
 @main_routes.route('/login', methods=['GET', 'POST'])
@@ -268,7 +268,8 @@ def add_user():
             return redirect(url_for('main.login'))
 
         try:
-            success = add_user_to_active_directory(connection, username, first_name, last_name, password, ou)
+            print(domain_to_search_base(session.get('domain')))
+            success = create_user(connection, username, first_name, last_name, password, ou, domain_to_search_base(session.get('domain')))
             if success:
                 flash(f"Użytkownik {username} został pomyślnie dodany.", "success")
             else:
