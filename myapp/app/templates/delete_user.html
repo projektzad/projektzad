@@ -24,13 +24,20 @@
                     <td>{{ user.distinguishedName }}</td>
                     <td>
                         <!-- Wyświetlanie atrybutów w formacie "nazwa_atrybutu: wartość" -->
-                        <ul>
-                            {% for key, value in user.items() %}
-                                {% if key != 'cn' and key != 'dn' %}
-                                    <li><strong>{{ key }}:</strong> {{ value }}</li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
+                        <div class="attributes-container">
+                            <button type="button" class="btn btn-info btn-sm toggle-attributes" data-toggle="collapse" data-target="#attributes-{{ user.cn }}">
+                                Show/Hide Attributes
+                            </button>
+                            <div id="attributes-{{ user.cn }}" class="collapse">
+                                <ul>
+                                    {% for key, value in user.items() %}
+                                        {% if key != 'cn' and key != 'dn' %}
+                                            <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -48,4 +55,19 @@
         <input type="file" name="file" id="file" required>
         <button type="submit" class="btn btn-danger">Delete Users from File</button>
     </form>
+
+    <script>
+        // JavaScript to enable the collapsing behavior for the attributes section
+        document.addEventListener('DOMContentLoaded', function () {
+            const toggleButtons = document.querySelectorAll('.toggle-attributes');
+            
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const targetId = button.getAttribute('data-target');
+                    const targetElement = document.querySelector(targetId);
+                    targetElement.classList.toggle('collapse');
+                });
+            });
+        });
+    </script>
 {% endblock %}

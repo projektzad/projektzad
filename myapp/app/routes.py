@@ -87,7 +87,6 @@ def checkbox_form():
     'userAccountControl',
     'sn',
     'sAMAccountType',
-    'aAMAaccountName',
     'pwdLastSet',
     'primaryGroupID',
     'objectCategory',
@@ -369,7 +368,7 @@ def toggle_block_user():
             else:
                 users = get_all_users(connection, search_base)
             print(users)
-            return render_template('block_user.html', users=users)
+            return render_template('block_user.html', users=users,options=session.get('options'))
         except Exception as e:
             
             flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
@@ -464,7 +463,7 @@ def expire_user():
                 users = get_all_users(connection, search_base,selected)
             else:
                 users = get_all_users(connection, search_base)
-            return render_template('expire_user.html', users=users)
+            return render_template('expire_user.html', users=users,options=session.get('options'))
         except Exception as e:
             flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
             return redirect(url_for('main.index'))
