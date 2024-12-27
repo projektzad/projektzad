@@ -18,6 +18,8 @@
                 <a class="nav-item nav-link" href="{{ url_for('main.modify_group_members') }}">Modify Group</a>
                 <a class="nav-item nav-link" href="{{ url_for('main.toggle_block_user') }}">Block User</a>
                 <a class="nav-item nav-link" href="{{ url_for('main.delete_user') }}">Delete User</a>
+                <a class="nav-item nav-link" href="{{ url_for('main.expire_user') }}">Expire User</a>
+                <a class="nav-item nav-link" href="{{ url_for('main.checkbox_form') }}">Checkbox</a>
                 {% if 'login' in session %}
                     <a class="nav-item nav-link" href="{{ url_for('main.logout') }}">Logout</a>
                 {% else %}

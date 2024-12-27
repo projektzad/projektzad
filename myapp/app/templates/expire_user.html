@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>Block/Unblock Users</h2>
+
+    <!-- Form for selecting users to block/unblock -->
+    <form method="post">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Username</th>
+                    <th>Domain</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        <!-- Checkbox for selecting users -->
+                        <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.dn }}">
+                    </td>
+                    <td>{{ user.cn }}</td>
+                    <td>{{ user.dn }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Expiration date field -->
+        <div class="form-group">
+            <label for="expiration_date">Expiration Date (Optional):</label>
+            <input type="date" id="expiration_date" name="expiration_date" class="form-control">
+        </div>
+
+        <button type="submit" class="btn btn-danger">Toggle Block Status</button>
+    </form>
+
+    <hr>
+
+    <!-- File upload section for blocking/unblocking users -->
+    <h3>Or block/unblock users via file upload</h3>
+    <form method="post" enctype="multipart/form-data">
+        <label for="file">Upload CSV or Excel File:</label>
+        <input type="file" name="file" id="file" required>
+        <button type="submit" class="btn btn-danger">Block/Unblock Users from File</button>
+    </form>
+
+{% endblock %}

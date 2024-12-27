@@ -10,6 +10,7 @@
                     <th>Select</th>
                     <th>Username</th>
                     <th>Domain</th>
+                    <th>Attributes</th> <!-- Nowa kolumna dla atrybutów -->
                 </tr>
             </thead>
             <tbody>
@@ -17,10 +18,20 @@
                 <tr>
                     <td>
                         <!-- Checkbox for selecting users -->
-                        <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.dn }}">
+                        <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.distinguishedName }}">
                     </td>
                     <td>{{ user.cn }}</td>
-                    <td>{{ user.dn }}</td>
+                    <td>{{ user.distinguishedName }}</td>
+                    <td>
+                        <!-- Wyświetlanie atrybutów w formacie "nazwa_atrybutu: wartość" -->
+                        <ul>
+                            {% for key, value in user.items() %}
+                                {% if key != 'cn' and key != 'dn' %}
+                                    <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -45,15 +45,15 @@ def expire_multiple_users(conn, file_path: str) -> int:
     file_extension = file_path.split('.')[-1].lower()
 
     if file_extension == 'csv':
-        processed_count = csv_expiring(file_path=file_path)
+        processed_count = csv_expiring(conn,file_path=file_path)
 
     elif file_extension == 'xlsx':
-        processed_count = excel_expiring(file_path=file_path)
+        processed_count = excel_expiring(conn,file_path=file_path)
         
     return processed_count
 
 
-def csv_expiring(file_path: str) -> int:
+def csv_expiring(conn, file_path: str) -> int:
     """
     Processes a CSV file to set the 'accountExpires' attribute for users listed in the file.
 
@@ -82,7 +82,7 @@ def csv_expiring(file_path: str) -> int:
 
     return processed_count
 
-def excel_expiring(file_path: str)-> int:
+def excel_expiring(conn, file_path: str)-> int:
     """
     Processes an Excel (XLSX) file to change the block status of users listed in the file.
 
