@@ -35,19 +35,30 @@ def domain_to_search_base(domain):
 
 
 import re
+
 def parse_user_data(user_data):
     # Wydzielenie domeny (wszystkie DC=...) oraz OU=...
     domain_parts = re.findall(r"DC=[^,]+", user_data)
     ou_parts = re.findall(r"OU=[^,]+", user_data)
-    cn_parts =  re.findall(r"CN=[^,]+", user_data)
+    cn_parts = re.findall(r"CN=[^,]+", user_data)
+
+      # Dodanie 'Users' do ou_parts, jeśli CN=Users znajduje się w cn_parts
+    if any("CN=Users" in part for part in cn_parts):
+        ou_parts.insert(0, "OU=Users")  # Dodaj 'Users' na początek ou_parts
+
+    # Join the organizational units with a slash
+    ou = "/".join(part.split('=')[1] for part in reversed(ou_parts)) if ou_parts else None
     # Join the domain parts with a dot
     domain = ".".join(part.split('=')[1] for part in domain_parts) if domain_parts else None
     
-    # Join the organizational units with a dot
-    ou = "/".join(part.split('=')[1] for part in reversed(ou_parts)) if ou_parts else None
+    # Usuwamy CN=Users z cn_parts, jeżeli znajduje się w cn_parts
+    cn_parts = [part for part in cn_parts if "CN=Users" not in part]  # Usuwamy CN=Users z cn_parts
     cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
 
-    return ou, domain, cn
+  
+
+    return domain, ou, cn
+
 
 # Decorator requiring admin privileges
 def requires_admin(f):
@@ -471,35 +482,42 @@ def expire_user():
 
 @main_routes.route('/modify_group_members', methods=['GET', 'POST'])
 def modify_group_members():
-    
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
     connection = get_ldap_connection()  # Get the LDAP connection
 
-    # If the request is POST, process the form
     if request.method == 'POST':
-        group_name = request.form.get('group_name') 
-        add_users = request.form.getlist('add_users') 
+        # Retrieve form data
+        group_name = request.form.get('group_name')
+        add_users = request.form.getlist('add_users')
         remove_users = request.form.getlist('remove_users')
 
         if not connection:
             flash_error("Brak połączenia z Active Directory.")
             return redirect(url_for('main.modify_group_members'))
 
-        errors = []
-        successes = []
+        errors = []  # Track failed operations
+        successes = []  # Track successful operations
 
+        # Fetch the groups and corresponding OUs
+        domain = session.get('domain', 'company.com')
+        groups, oulist = list_all_groups(connection, domain)
+
+        # Map the selected group name to its corresponding OU
+        group_ou = None
+        if group_name in groups:
+            group_ou = oulist[groups.index(group_name)]  # Get the corresponding OU
+
+        domain2, group_ou, group_cn = parse_user_data(group_ou)
         # Add users to the group
         for username in add_users:
             try:
-                if username.strip():
-                    users_domain = session.get('domain', 'testad.local') # Replace with your domain
-                    users_ou = 'users'  # Replace with your users OU
-                    group_domain = session.get('domain', 'testad.local')  # Replace with your domain
-                    group_ou = 'groups'  # Replace with your groups OU
-
-                    success = add_user_to_group(connection, username.strip(), users_domain, users_ou, group_name, group_domain, group_ou)
+                if username: 
+                    domain2, users_ou, cn = parse_user_data(username)
+                    print(cn, domain, users_ou, group_name, domain, domain)
+                    success = add_user_to_group(connection,cn, domain, users_ou, group_name, domain, group_ou)
+                    
                     if success:
                         successes.append(username)
                     else:
@@ -510,13 +528,11 @@ def modify_group_members():
         # Remove users from the group
         for username in remove_users:
             try:
-                if username.strip():
-                    users_domain = 'company.com'  # Replace with your domain
-                    users_ou = 'users'  # Replace with your users OU
-                    group_domain = 'company.com'  # Replace with your domain
-                    group_ou = 'groups'  # Replace with your groups OU
-
-                    success = remove_user_from_group(connection, username.strip(), users_domain, users_ou, group_name, group_domain, group_ou)
+                if username:  # Skip empty inputs
+                    # Parse user data for domain and OU
+                    domain2, users_ou, cn = parse_user_data(username)
+                    print(cn, users_ou, group_name, domain)
+                    success = remove_user_from_group(connection,cn, domain, users_ou, group_name, domain, group_ou)
                     if success:
                         successes.append(username)
                     else:
@@ -524,26 +540,44 @@ def modify_group_members():
             except Exception as e:
                 errors.append(f"Nie udało się usunąć użytkownika {username}: {str(e)}")
 
-        # Handle success and errors
+        # Handle results
         if successes:
             flash(f"Zmodyfikowano członków grupy: {', '.join(successes)}.", "success")
         if errors:
             flash_error(f"Wystąpiły błędy podczas modyfikacji członków grupy: {', '.join(errors)}.")
 
-        return redirect(url_for('main.modify_group_members'))  # Always redirect after POST
+        # Redirect after POST to avoid duplicate form submissions
+        return redirect(url_for('main.modify_group_members'))
 
     elif request.method == 'GET':
         try:
+            # Fetch domain and groups
             domain = session.get('domain', 'company.com')
-            groups = list_all_groups(connection, domain)
+            groups, oulist = list_all_groups(connection, domain)
 
-            selected_group = "Users"
-            members = list_group_members(connection, selected_group) if selected_group else []
-            print(members)
-            return render_template('modify_group_members.html', groups=groups, members=members, selected_group=selected_group)
+            # Fetch selected group and its members
+            selected_group = request.args.get('group_name')
+            members = list_group_members(connection, domain, selected_group) if selected_group else []
+
+            # Fetch all users for adding
+            users = get_all_users(connection, domain_to_search_base(domain), session.get('options'))
+
+            return render_template(
+                'modify_group_members.html',
+                groups=groups,
+                members=members,
+                selected_group=selected_group,
+                users=users  # Pass the list of users to the template
+            )
         except Exception as e:
             flash_error(f"Nie można pobrać listy grup: {str(e)}")
             return redirect(url_for('main.index'))
+
+
+@main_routes.route('/groups_management', methods=['GET'])
+def groups_management():
+    return render_template('groups_management.html', groups=[])
+
 
 
 @main_routes.app_errorhandler(404)

@@ -9,13 +9,30 @@ def domain_to_dn(domain:str) -> str:
     dn = ','.join([f"dc={part}" for part in parts])
     return dn
 
-def list_all_groups(conn, domain:str) -> list:
+def list_all_groups(conn, domain: str) -> tuple:
     group_list = []
-    conn.search(domain_to_dn(domain=domain), '(objectClass=group)', attributes=['cn'])
+    ou_list = []  # List to store corresponding OUs
+    
+    # Perform the LDAP search to get groups
+    conn.search(domain_to_dn(domain=domain), '(objectClass=group)', attributes=['cn', 'distinguishedName'])
+    
     for entry in conn.entries:
-        group_list.append(str(entry.cn).replace("cn: ", ""))
+        # Extract the CN and OU from the distinguishedName (DN)
+        cn = str(entry.cn).replace("cn: ", "")
+        distinguished_name = str(entry.distinguishedName)  # Get the full DN
+        ou = None
+        
+        # Parse the distinguishedName to find the OU
+        if "OU=" in distinguished_name:
+            # Extract the OU part from the distinguishedName
+            ou = ', '.join([part for part in distinguished_name.split(',') if part.startswith("OU=")])
+        
+        # Add the group name and OU to their respective lists
+        group_list.append(cn)
+        ou_list.append(ou if ou else "")  # If no OU found, append an empty string
+    
+    return group_list, ou_list
 
-    return group_list
 
 def add_user_to_group(conn, username: str, users_domain :str, users_ou:str, group: str, group_domain:str, group_ou :str) -> bool:
     user = create_distinguished_name(username, users_domain, users_ou)
@@ -176,25 +193,65 @@ def process_config_file(conn, file_path: str) -> bool:
     else:
         return -1
 
-def list_group_members(conn, group_dn: str) -> list:
+def list_group_members(conn, domain: str, group_name: str) -> list:
+
     """
-    Funkcja zwraca listę członków grupy na podstawie jej DN.
-    :param conn: Połączenie LDAP
-    :param group_dn: Distinguished Name grupy
-    :return: Lista członków grupy (DN użytkowników)
+
+    Retrieves the members of a specific group in a given LDAP domain.
+ 
+    Args:
+
+        conn: LDAP connection object.
+
+        domain (str): The LDAP domain to search in.
+
+        group_name (str): The name of the group whose members should be retrieved.
+ 
+    Returns:
+
+        list: A list of members (as DN strings) in the specified group, or an empty list if no members are found.
+
     """
+
     try:
-        # Szukanie grupy na podstawie jej DN
-        conn.search(search_base=group_dn,
-                    search_filter='(objectClass=group)',
-                    attributes=['member'])
-        if not conn.entries:
-            print(f"Grupa {group_dn} nie została znaleziona.")
-            return []
-        # Pobranie atrybutu 'member'
-        group = conn.entries[0]
-        members = group.member.values if 'member' in group else []
-        return members
-    except Exception as e:
-        print(f"Błąd podczas pobierania członków grupy: {e}")
+
+        # Convert domain to a Distinguished Name (DN)
+
+        search_base = domain_to_dn(domain=domain)
+
+        # Perform LDAP search for the specific group
+
+        search_filter = f'(&(objectClass=group)(cn={group_name}))'
+
+        conn.search(search_base, search_filter, attributes=['member'])
+
+        # Check if the group is found
+
+        if conn.entries:
+
+            entry = conn.entries[0]
+
+            # Extract members (if any)
+
+            if 'member' in entry:
+
+                return [str(member) for member in entry.member]
+
+        # If group is not found or has no members
+
+        print(f"No members found in group: {group_name}")
+
         return []
+
+    except Exception as e:
+
+        # Handle potential errors
+
+        print(f"An error occurred while listing members of the group {group_name}: {e}")
+
+        return []
+
+ 
+
+
+ 

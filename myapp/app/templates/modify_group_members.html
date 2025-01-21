@@ -3,6 +3,7 @@
 {% block content %}
 <h2>Modify Group Members</h2>
 
+<!-- Dropdown to Select a Group -->
 <form method="get">
     <div class="form-group">
         <label for="group_name">Select Group</label>
@@ -15,28 +16,41 @@
     </div>
 </form>
 
+<!-- Show Current Members if a Group is Selected -->
 {% if members %}
 <h3>Current Members of {{ selected_group }}</h3>
-<ul>
-    {% for member in members %}
-    <li>{{ member }}</li>
-    {% endfor %}
-</ul>
-{% endif %}
-
 <form method="post">
     <input type="hidden" name="group_name" value="{{ selected_group }}">
     
+    <!-- Users to Add Section -->
     <div class="form-group">
         <label for="add_users">Users to Add</label>
-        <textarea class="form-control" id="add_users" name="add_users" rows="3" placeholder="Enter usernames separated by commas"></textarea>
+        <p>Select users to add:</p>
+        {% for user in users %}
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="add_users" value="{{ user }}" id="add_{{ loop.index }}">
+            <label class="form-check-label" for="add_{{ loop.index }}">
+                {{ user }}
+            </label>
+        </div>
+        {% endfor %}
     </div>
 
+    <!-- Users to Remove Section -->
     <div class="form-group">
         <label for="remove_users">Users to Remove</label>
-        <textarea class="form-control" id="remove_users" name="remove_users" rows="3" placeholder="Enter usernames separated by commas"></textarea>
+        <p>Select members to remove:</p>
+        {% for member in members %}
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="remove_users" value="{{ member }}" id="remove_{{ loop.index }}">
+            <label class="form-check-label" for="remove_{{ loop.index }}">
+                {{ member }}
+            </label>
+        </div>
+        {% endfor %}
     </div>
 
     <button type="submit" class="btn btn-info">Modify Group</button>
 </form>
+{% endif %}
 {% endblock %}

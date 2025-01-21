@@ -62,7 +62,7 @@ def get_users_password_from_env_variable(env_variable_name: str) -> (bool, str):
     except Exception:
         return (False, "")
 
-def create_distinguished_name(username: str, domain: str, organizational_unit: str = "Users") -> str:
+def create_distinguished_name(username: str, domain: str, organizational_unit: str = "Users", is_group: bool = False) -> str:
     """
     Combines arguments into a distinguished name (necessary to authenticate to Active Directory).
     Supports nested Organizational Units (OUs) separated by '/'.
@@ -81,17 +81,25 @@ def create_distinguished_name(username: str, domain: str, organizational_unit: s
     """
     domain_parts = domain.split(".")
     
+
     if "/" in organizational_unit:
         ou_parts = organizational_unit.split("/")
         ou_parts.reverse()
         ou_dn = ",".join([f"OU={ou}" for ou in ou_parts])
         dn = f"CN={username},{ou_dn}," + ",".join([f"DC={part}" for part in domain_parts])
     else:
-        if organizational_unit == "Users":
-            dn = f"CN={username},CN={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
+        if not is_group:
+            if organizational_unit == "Users":
+                dn = f"CN={username},CN={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
+            else:
+                dn = f"CN={username},OU={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
         else:
-            dn = f"CN={username},OU={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
-    
+            if organizational_unit == "":         
+                dn = f"CN={username}," + ",".join([f"DC={part}" for part in domain_parts])
+            else:
+                dn = f"CN={username},OU={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
+
+
     return dn
 
 def correct_username(username: str, domain: str) -> str:
