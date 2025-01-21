@@ -21,7 +21,7 @@ from app.models.batch_delete_users import delete_multiple_users
 from app.models.block import block_multiple_users
 from app.models.expire import expire_multiple_users,set_account_expiration
 from app.models.add import create_user
-from app.models.group_modify import add_user_to_group, remove_user_from_group,list_all_groups,list_group_members
+from app.models.group_modify import add_user_to_group, remove_user_from_group,list_all_groups,list_group_members, remove_group, add_new_group, load_json_config
 main_routes = Blueprint('main', __name__)
 
 connection_global = None
@@ -54,8 +54,6 @@ def parse_user_data(user_data):
     # Usuwamy CN=Users z cn_parts, jeżeli znajduje się w cn_parts
     cn_parts = [part for part in cn_parts if "CN=Users" not in part]  # Usuwamy CN=Users z cn_parts
     cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
-
-  
 
     return domain, ou, cn
 
@@ -573,10 +571,82 @@ def modify_group_members():
             flash_error(f"Nie można pobrać listy grup: {str(e)}")
             return redirect(url_for('main.index'))
 
-
-@main_routes.route('/groups_management', methods=['GET'])
+@main_routes.route('/groups_management', methods=['GET', 'POST'])
 def groups_management():
-    return render_template('groups_management.html', groups=[])
+    if 'login' not in session:
+        return redirect(url_for('main.login'))
+
+    connection = get_ldap_connection()  # Establish the LDAP connection
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.index'))
+
+    domain = session.get('domain', 'company.com')
+
+    if request.method == 'POST':
+        action = request.form.get('action')  # Determine if adding or deleting
+        group_name = request.form.get('group_name')
+
+        if not group_name:
+            flash_error("Group name cannot be empty.")
+            return redirect(url_for('main.groups_management'))
+
+        if action == 'add':
+            try:
+                # Load configuration for the new group
+                config_path = os.path.abspath('./app/templates/group-config.json')
+                
+                config = load_json_config(config_path)
+
+                # Attempt to add the group
+                success = add_new_group(connection, config)
+                if success:
+                    flash(f"Group '{group_name}' added successfully.", "success")
+                else:
+                    flash_error(f"Failed to add group '{group_name}'. Check the logs for more details.")
+            except FileNotFoundError:
+                flash_error(f"Configuration file not found at at at '{config_path}'.")
+            except KeyError as ke:
+                flash_error(f"Configuration is missing a required field: {str(ke)}")
+            except Exception as e:
+                flash_error(f"Error while adding group '{group_name}': {str(e)}")
+
+        elif action == 'delete':
+            try:
+                print("Iam here")
+                # Fetch group details to get the correct OU
+                groups, oulist = list_all_groups(connection, domain)
+                group_ou = oulist[groups.index(group_name)] if group_name in groups else None
+
+                if not group_ou:
+                    flash_error(f"Group '{group_name}' not found.")
+                    return redirect(url_for('main.groups_management'))
+
+                _, group_ou, _ = parse_user_data(group_ou)
+
+                # Attempt to delete the group
+                print(group_name ,"+", domain , "+", group_ou, "+")
+                success = remove_group(connection, group_name, domain, group_ou)  # Implement this function
+                if success:
+                    flash(f"Group '{group_name}' deleted successfully.", "success")
+                else:
+                    flash_error(f"Failed to delete group '{group_name}'.")
+            except ValueError:
+                flash_error(f"Group '{group_name}' not found in the domain.")
+            except Exception as e:
+                flash_error(f"Error while deleting group '{group_name}': {str(e)}")
+
+        # Redirect to refresh the group list
+        return redirect(url_for('main.groups_management'))
+
+    # Handle GET request: Retrieve and display the list of groups
+    try:
+        groups, _ = list_all_groups(connection, domain)  # Fetch all groups
+        return render_template('groups_management.html', groups=groups)
+    except Exception as e:
+        flash_error(f"Nie można pobrać listy grup: {str(e)}")
+        return redirect(url_for('main.index'))
+
 
 
 

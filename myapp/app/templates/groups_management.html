@@ -1,9 +1,36 @@
-<!-- templates/group_management.html -->
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">Group Management</h1>
+<div class="mt-4">
+    <h1>Group Management</h1>
+
+    <!-- Form to add a new group -->
+    <form method="POST" action="{{ url_for('main.groups_management') }}" class="mb-4">
+        <input type="hidden" name="action" value="add">
+        <div class="form-group">
+            <label for="group_name">Add New Group:</label>
+            <input type="text" class="form-control" id="group_name" name="group_name" placeholder="Enter group name" required>
+        </div>
+        <button type="submit" class="btn btn-success">Add Group</button>
     </form>
+
+    <!-- List of groups with delete option -->
+    <h2>Existing Groups</h2>
+    {% if groups %}
+        <ul class="list-group">
+            {% for group in groups %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ group }}
+                    <form method="POST" action="{{ url_for('main.groups_management') }}" class="d-inline">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="group_name" value="{{ group }}">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">No groups found. Add a group above.</p>
+    {% endif %}
 </div>
 {% endblock %}

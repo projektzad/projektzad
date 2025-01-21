@@ -142,13 +142,14 @@ def load_json_config(file_path: str) -> dict:
         data = json.load(f)
     return data
 
-def remove_group(conn, group_DN) -> bool:
+def remove_group(conn,group, group_domain, group_ou) -> bool:
+    group_DN = create_distinguished_name(group, group_domain, group_ou, is_group=True)
     return conn.delete(group_DN)
 
 def add_new_group(conn, config) -> bool:
 
     objectClass = ['top', 'group']
-    if "OU=" in config.get(group_DN):
+    if "OU=" in config.get('group_DN'):
         objectClass = ['top', 'group', 'organizationalUnit']
     """
     try:
@@ -176,7 +177,6 @@ def add_new_group(conn, config) -> bool:
         else: 
             return -1
             
-
 
 def process_config_file(conn, file_path: str) -> bool:
     
