@@ -540,7 +540,7 @@ def modify_group_members():
         if group_name in groups:
             group_ou = oulist[groups.index(group_name)]  # Get the corresponding OU
 
-        domain2, group_ou, group_cn = parse_user_data(group_ou)
+        domain2, group_ou, group_cn = parse_user_data2(group_ou)
         # Add users to the group
         for username in add_users:
             try:
