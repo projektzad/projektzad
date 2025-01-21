@@ -36,7 +36,7 @@ def domain_to_search_base(domain):
 
 import re
 
-def parse_user_data(user_data):
+def parse_user_data2(user_data):
     # Wydzielenie domeny (wszystkie DC=...) oraz OU=...
     domain_parts = re.findall(r"DC=[^,]+", user_data)
     ou_parts = re.findall(r"OU=[^,]+", user_data)
@@ -56,6 +56,20 @@ def parse_user_data(user_data):
     cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
 
     return domain, ou, cn
+
+def parse_user_data(user_data):
+    # Wydzielenie domeny (wszystkie DC=...) oraz OU=...
+    domain_parts = re.findall(r"DC=[^,]+", user_data)
+    ou_parts = re.findall(r"OU=[^,]+", user_data)
+    cn_parts =  re.findall(r"CN=[^,]+", user_data)
+    # Join the domain parts with a dot
+    domain = ".".join(part.split('=')[1] for part in domain_parts) if domain_parts else None
+    
+    # Join the organizational units with a dot
+    ou = "/".join(part.split('=')[1] for part in reversed(ou_parts)) if ou_parts else None
+    cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
+
+    return ou, domain, cn
 
 
 # Decorator requiring admin privileges
@@ -316,9 +330,11 @@ def toggle_block_user():
             successes = []
             for user_data in selected_users:
                 try:
+                    
                     username, domain = user_data.split('|')
+                    
                     ou, domain, cn = parse_user_data(domain)
-                    print(ou)
+           
                  
                     if ou:
                         success = change_users_block_status(connection, username, domain, ou)
@@ -512,7 +528,7 @@ def modify_group_members():
         for username in add_users:
             try:
                 if username: 
-                    domain2, users_ou, cn = parse_user_data(username)
+                    domain2, users_ou, cn = parse_user_data2(username)
                     print(cn, domain, users_ou, group_name, domain, domain)
                     success = add_user_to_group(connection,cn, domain, users_ou, group_name, domain, group_ou)
                     
@@ -528,7 +544,7 @@ def modify_group_members():
             try:
                 if username:  # Skip empty inputs
                     # Parse user data for domain and OU
-                    domain2, users_ou, cn = parse_user_data(username)
+                    domain2, users_ou, cn = parse_user_data2(username)
                     print(cn, users_ou, group_name, domain)
                     success = remove_user_from_group(connection,cn, domain, users_ou, group_name, domain, group_ou)
                     if success:
@@ -622,7 +638,7 @@ def groups_management():
                     flash_error(f"Group '{group_name}' not found.")
                     return redirect(url_for('main.groups_management'))
 
-                _, group_ou, _ = parse_user_data(group_ou)
+                _, group_ou, _ = parse_user_data2(group_ou)
 
                 # Attempt to delete the group
                 print(group_name ,"+", domain , "+", group_ou, "+")
