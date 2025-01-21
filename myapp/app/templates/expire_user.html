@@ -19,7 +19,7 @@
                 <tr>
                     <td>
                         <!-- Checkbox for selecting users -->
-                        <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.dn }}">
+                        <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.distinguishedName }}">
                     </td>
                     <td>{{ user.name }}</td>
                     <td>{{ user.distinguishedName }}</td>
@@ -46,10 +46,12 @@
         </table>
 
         <!-- Expiration date field -->
+        <!-- Expiration date field -->
         <div class="form-group">
-            <label for="expiration_date">Expiration Date (Optional):</label>
-            <input type="date" id="expiration_date" name="expiration_date" class="form-control">
+            <label for="expiration_date">Expiration Date (Required):</label>
+            <input type="date" id="expiration_date" name="expiration_date" class="form-control" required>
         </div>
+
 
         <button type="submit" class="btn btn-danger">Toggle Block Status</button>
     </form>

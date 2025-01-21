@@ -3,6 +3,7 @@ from functools import wraps
 from werkzeug.utils import secure_filename
 import sys
 import os
+from datetime import datetime
 
 
 # Get the absolute path to the 'models' directory
@@ -15,12 +16,12 @@ sys.path.append(models_path)
 from app.models import connection as co
 from app.models.block import change_users_block_status
 from app.models.delete import delete_user_from_active_directory
-from app.models.group_modify import modify_members, get_list
 from app.models.all_users import get_all_users
 from app.models.batch_delete_users import delete_multiple_users
 from app.models.block import block_multiple_users
 from app.models.expire import expire_multiple_users,set_account_expiration
 from app.models.add import create_user
+from app.models.group_modify import add_user_to_group, remove_user_from_group,list_all_groups,list_group_members
 main_routes = Blueprint('main', __name__)
 
 connection_global = None
@@ -173,6 +174,7 @@ def delete_user():
             errors = []
             successes = []
             for user_data in selected_users:
+                print("USER DATA FROM DELETE:",user_data)
                 try:
                     username, domain = user_data.split('|')
                     ou, domain, cn = parse_user_data(domain)
@@ -299,14 +301,16 @@ def toggle_block_user():
 
         # Handle the form for selected users
         selected_users = request.form.getlist('selected_users')  # List of selected users
+       
         if selected_users:
             errors = []
             successes = []
             for user_data in selected_users:
                 try:
                     username, domain = user_data.split('|')
-                    ou, domain,cn = parse_user_data(domain)
+                    ou, domain, cn = parse_user_data(domain)
                     print(ou)
+                 
                     if ou:
                         success = change_users_block_status(connection, username, domain, ou)
                     else:
@@ -365,10 +369,10 @@ def toggle_block_user():
             search_base = domain_to_search_base(domain)
             selected = session.get('options')
             if selected:
-                users = get_all_users(connection, search_base,selected)
+                users = get_all_users(connection, search_base, selected)
             else:
                 users = get_all_users(connection, search_base)
-            print(users)
+            
             return render_template('block_user.html', users=users,options=session.get('options'))
         except Exception as e:
             
@@ -386,32 +390,28 @@ def expire_user():
 
     # If the request is POST, process the form
     if request.method == 'POST':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
-
         # Handle the form for selected users
-        selected_users = request.form.getlist('selected_users')  # List of selected users
+        selected_users = request.form.getlist('selected_users') 
         if selected_users:
             errors = []
             successes = []
             for user_data in selected_users:
                 try:
                     username, domain = user_data.split('|')
-                    ou, domain,cn = parse_user_data(domain)
-                    expiration_date = request.form('expiration_date')
-                    #print(ou)
+                    ou, domain, cn = parse_user_data(domain)
+                    expiration_date = request.form.get('expiration_date')
+                    formatted_date = datetime.strptime(expiration_date, '%Y-%m-%d').strftime('%d-%m-%Y')
+                    print(expiration_date)
                     if ou:
-                        success = set_account_expiration(connection, username, domain,expiration_date,ou)
+                        success = set_account_expiration(connection, username, domain,formatted_date,ou)
                     else:
-                        # Jeśli OU jest puste, przekazujemy tylko username i domain
-                        success = set_account_expiration(connection, username, domain,expiration_date)
+                        success = set_account_expiration(connection, username, domain, formatted_date)
                     if success:
                         successes.append(username)
                     else:
                         errors.append(username)
                 except ValueError:
-                    errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
+                    errors.append(f"Nieprawidłowy format danych użytkownika!!: {user_data}")
 
             # Handle success and errors
             if successes:
@@ -469,37 +469,82 @@ def expire_user():
             flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
             return redirect(url_for('main.index'))
 
-
 @main_routes.route('/modify_group_members', methods=['GET', 'POST'])
 def modify_group_members():
+    
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
+    connection = get_ldap_connection()  # Get the LDAP connection
+
+    # If the request is POST, process the form
     if request.method == 'POST':
-        group_dn = request.form['group_dn']
-        add_users = request.form.get('add_users', '')
-        remove_users = request.form.get('remove_users', '')
+        group_name = request.form.get('group_name') 
+        add_users = request.form.getlist('add_users') 
+        remove_users = request.form.getlist('remove_users')
 
-        connection = get_ldap_connection()
-        if connection:
-            base_dn = 'ou=users,o=company'
-            add_list = get_list(base_dn, add_users)
-            remove_list = get_list(base_dn, remove_users)
+        if not connection:
+            flash_error("Brak połączenia z Active Directory.")
+            return redirect(url_for('main.modify_group_members'))
 
+        errors = []
+        successes = []
+
+        # Add users to the group
+        for username in add_users:
             try:
-                success = modify_members(group_dn, connection, addList=add_list, deleteList=remove_list)
-                if success:
-                    flash('Członkowie grupy zostali pomyślnie zmodyfikowani.', 'success')
-                else:
-                    flash_error('Wystąpił błąd podczas modyfikacji członków grupy.')
+                if username.strip():
+                    users_domain = session.get('domain', 'testad.local') # Replace with your domain
+                    users_ou = 'users'  # Replace with your users OU
+                    group_domain = session.get('domain', 'testad.local')  # Replace with your domain
+                    group_ou = 'groups'  # Replace with your groups OU
+
+                    success = add_user_to_group(connection, username.strip(), users_domain, users_ou, group_name, group_domain, group_ou)
+                    if success:
+                        successes.append(username)
+                    else:
+                        errors.append(username)
             except Exception as e:
-                flash_error(f"Wystąpił błąd: {str(e)}")
-        else:
-            flash_error('Brak połączenia z Active Directory.')
+                errors.append(f"Nie udało się dodać użytkownika {username}: {str(e)}")
 
-        return redirect(url_for('main.index'))
+        # Remove users from the group
+        for username in remove_users:
+            try:
+                if username.strip():
+                    users_domain = 'company.com'  # Replace with your domain
+                    users_ou = 'users'  # Replace with your users OU
+                    group_domain = 'company.com'  # Replace with your domain
+                    group_ou = 'groups'  # Replace with your groups OU
 
-    return render_template('modify_group_members.html')
+                    success = remove_user_from_group(connection, username.strip(), users_domain, users_ou, group_name, group_domain, group_ou)
+                    if success:
+                        successes.append(username)
+                    else:
+                        errors.append(username)
+            except Exception as e:
+                errors.append(f"Nie udało się usunąć użytkownika {username}: {str(e)}")
+
+        # Handle success and errors
+        if successes:
+            flash(f"Zmodyfikowano członków grupy: {', '.join(successes)}.", "success")
+        if errors:
+            flash_error(f"Wystąpiły błędy podczas modyfikacji członków grupy: {', '.join(errors)}.")
+
+        return redirect(url_for('main.modify_group_members'))  # Always redirect after POST
+
+    elif request.method == 'GET':
+        try:
+            domain = session.get('domain', 'company.com')
+            groups = list_all_groups(connection, domain)
+
+            selected_group = "Users"
+            members = list_group_members(connection, selected_group) if selected_group else []
+            print(members)
+            return render_template('modify_group_members.html', groups=groups, members=members, selected_group=selected_group)
+        except Exception as e:
+            flash_error(f"Nie można pobrać listy grup: {str(e)}")
+            return redirect(url_for('main.index'))
+
 
 @main_routes.app_errorhandler(404)
 def page_not_found(error):

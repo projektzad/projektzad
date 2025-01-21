@@ -1,21 +1,42 @@
-<!-- templates/modify_group_members.html -->
 {% extends 'base.html' %}
 
 {% block content %}
-    <h2>Modify Group Members</h2>
-    <form method="post">
-        <div class="form-group">
-            <label for="group_dn">Group DN</label>
-            <input type="text" class="form-control" id="group_dn" name="group_dn" required>
-        </div>
-        <div class="form-group">
-            <label for="add_users">Users to Add (comma-separated)</label>
-            <input type="text" class="form-control" id="add_users" name="add_users">
-        </div>
-        <div class="form-group">
-            <label for="remove_users">Users to Remove (comma-separated)</label>
-            <input type="text" class="form-control" id="remove_users" name="remove_users">
-        </div>
-        <button type="submit" class="btn btn-info">Modify Group</button>
-    </form>
+<h2>Modify Group Members</h2>
+
+<form method="get">
+    <div class="form-group">
+        <label for="group_name">Select Group</label>
+        <select class="form-control" id="group_name" name="group_name" onchange="this.form.submit()">
+            <option value="" disabled selected>-- Select a Group --</option>
+            {% for group in groups %}
+            <option value="{{ group }}" {% if group == selected_group %}selected{% endif %}>{{ group }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</form>
+
+{% if members %}
+<h3>Current Members of {{ selected_group }}</h3>
+<ul>
+    {% for member in members %}
+    <li>{{ member }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<form method="post">
+    <input type="hidden" name="group_name" value="{{ selected_group }}">
+    
+    <div class="form-group">
+        <label for="add_users">Users to Add</label>
+        <textarea class="form-control" id="add_users" name="add_users" rows="3" placeholder="Enter usernames separated by commas"></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="remove_users">Users to Remove</label>
+        <textarea class="form-control" id="remove_users" name="remove_users" rows="3" placeholder="Enter usernames separated by commas"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-info">Modify Group</button>
+</form>
 {% endblock %}

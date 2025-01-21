@@ -17,7 +17,7 @@ def create_user(conn, username, firstname, lastname, password, ou, dc):
 
     # Construct Distinguished Name (DN) dynamically using ou and dc
     
-    user_dn = f'CN={firstname} {lastname},OU={ou},DC=testad,DC=local'
+    user_dn = f'CN={firstname} {lastname},{ou},{dc}'
     print(user_dn)
     # Define user attributes
     attributes = {

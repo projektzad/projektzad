@@ -1,0 +1,54 @@
+{
+    "action": "add/remove/modify",
+    "group_DN": "",
+    "General": {
+        "Group name (pre-Windows 2000)": "",
+        "Description": "",
+        "E-mail": "",
+        "Group scope": "Domain local/Global/Universal",
+        "Group type": "Security/Distribution",
+        "Notes": ""
+    },
+    "Members": [
+        {
+            "action": "add/remove",
+            "User, Service Account, Group, or Other Object DN": ""
+        }
+    ],
+    "Member of": [
+        {
+            "action": "add/remove",
+            "group or Built-in security principals DN": ""
+        }
+    ],
+    "Managed By": {
+        "User, Group or Built-in security principals DN": "",
+        "Manager can update membership list": false
+    },
+    "Object": {
+        "Protect from accidential deletion": false
+    },
+    "Attribute Editor": [
+        {
+            "Attribute": "",
+            "Value": ""
+        }
+    ],
+    "Security": [
+        {
+            "action": "add/remove/modify",
+            "Users, Groups or Built-in security principals DN": "",
+            "Permissions": {
+                "Full control": "allow/deny",
+                "Read": "allow/deny",
+                "Write": "allow/deny",
+                "Create all child objects": "allow/deny",
+                "Delete all child objects": "allow/deny",
+                "Add/remove self as member": "allow/deny",
+                "Send to": "allow/deny",
+                "Read phone and mail options": "allow/deny",
+                "Write phone and mail options": "allow/deny"
+            }
+        }
+    ]
+}
