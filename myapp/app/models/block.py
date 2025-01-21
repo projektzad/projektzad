@@ -135,3 +135,8 @@ def excel_blocking(file_path: str, conn)-> int:
             processed_count += 1
 
     return processed_count
+
+def get_blocked_users_count(conn, search_base: str) -> int:
+    conn.search(search_base, '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=2))')
+    return len(conn.entries)
+

@@ -5,6 +5,11 @@
     <h1>Welcome to LDAP Admin</h1>
     {% if 'login' in session %}
         <p>Hello, {{ session['login'] }}! You're logged in.</p>
+        <ul>
+            <li>Users: {{ stats.total_users }}</li>
+            <li>Blocked: {{ stats.blocked_users }}</li>
+            <li>Users with future expire: {{ stats.expiring_users }}</li>
+        </ul>
     {% else %}
         <p>Please log in to access the features.</p>
     {% endif %}

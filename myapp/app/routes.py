@@ -14,12 +14,12 @@ sys.path.append(models_path)
 
 # Import the necessary modules and functions
 from app.models import connection as co
-from app.models.block import change_users_block_status
+from app.models.block import change_users_block_status,get_blocked_users_count
 from app.models.delete import delete_user_from_active_directory
-from app.models.all_users import get_all_users
+from app.models.all_users import get_all_users,get_all_users_count
 from app.models.batch_delete_users import delete_multiple_users
 from app.models.block import block_multiple_users
-from app.models.expire import expire_multiple_users,set_account_expiration
+from app.models.expire import expire_multiple_users,set_account_expiration,get_expiring_users_count
 from app.models.add import create_user
 from app.models.group_modify import add_user_to_group, remove_user_from_group,list_all_groups,list_group_members
 main_routes = Blueprint('main', __name__)
@@ -85,8 +85,25 @@ def validate_form(fields):
 @main_routes.route('/')
 def index():
     if 'login' in session:
-        return render_template('index.html', login=session["login"])
+        domain = session.get('domain', 'default.local')
+        search_base = domain_to_search_base(domain)
+        connection = get_ldap_connection()
+        if not connection:
+            flash("Brak aktywnego połączenia z LDAP. Zaloguj się ponownie.", "danger")
+            return redirect(url_for('main.login'))
+        try:
+            stats = {
+                'total_users': get_all_users_count(connection, search_base),
+                'blocked_users': get_blocked_users_count(connection, search_base),
+                'expiring_users': get_expiring_users_count(connection, search_base)
+            }
+            return render_template('index.html', login=session["login"], stats=stats)
+        except Exception as e:
+            flash(f"Wystąpił błąd: {str(e)}", "danger")
+            return redirect(url_for('main.index'))
     return redirect(url_for('main.login'))
+
+
 
 @main_routes.route('/checkbox_form', methods=['GET', 'POST'])
 def checkbox_form():

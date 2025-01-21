@@ -105,10 +105,7 @@ def excel_expiring(conn, file_path: str)-> int:
 
     return processed_count
 
+def get_expiring_users_count(conn, search_base: str) -> int:
+    conn.search(search_base, '(&(objectClass=user)(accountExpires>=1))')
+    return len(conn.entries)
 
-
-if __name__ == "__main__":
-    import connection
-    ok, conn = connection.connect_to_active_directory("ldap://192.168.203.77","TESTAD\\Administrator", "rdFCftVGhjuikj9&", "testad.local")
-    print(ok, conn)
-    print(csv_expiring("/home/stasiek/Documents/studia/ipz1/repo/projektzad/myapp/app/templates/csv-expiring.csv"))
