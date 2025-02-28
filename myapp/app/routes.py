@@ -623,9 +623,14 @@ def process_user_addition(connection, add_users, domain, group_name, group_ou, s
     for username in add_users:
         try:
             if username:
-                domain2, users_ou, cn = parse_user_data2(username)
-                print(cn, domain, users_ou, group_name, domain, domain)
-                success = add_user_to_group(connection, cn, domain, users_ou, group_name, domain, group_ou)
+                #print(username)
+                _, users_ou, cn = parse_user_data2(username)
+                group_ou_parsed,_,_ = parse_user_data(group_ou)
+                #print(cn, domain, users_ou, group_name, domain, group_ou)
+                if group_ou_parsed:
+                    success = add_user_to_group(connection, cn, domain, users_ou, group_name, domain, group_ou_parsed)
+                else:
+                    success = add_user_to_group(connection, cn, domain, users_ou, group_name, domain, group_ou)
                 if success:
                     successes.append(username)
                 else:
@@ -639,9 +644,13 @@ def process_user_removal(connection, remove_users, domain, group_name, group_ou,
     for username in remove_users:
         try:
             if username:
-                domain2, users_ou, cn = parse_user_data2(username)
-                print(cn, users_ou, group_name, domain)
-                success = remove_user_from_group(connection, cn, domain, users_ou, group_name, domain, group_ou)
+                _, users_ou, cn = parse_user_data2(username)
+                group_ou_parsed,_,_ = parse_user_data(group_ou)
+                if group_ou_parsed:
+                    success = remove_user_from_group(connection, cn, domain, users_ou, group_name, domain, group_ou_parsed)
+                else:
+                    success = remove_user_from_group(connection, cn, domain, users_ou, group_name, domain, group_ou)
+            
                 if success:
                     successes.append(username)
                 else:
@@ -662,17 +671,19 @@ def handle_get_group_modification(connection):
     """Handle GET request for displaying group modification form."""
     try:
         domain = session.get('domain', 'company.com')
-        groups, oulist = list_all_groups(connection, domain)
+        groups, _ = list_all_groups(connection, domain)
         selected_group = request.args.get('group_name')
         members = list_group_members(connection, domain, selected_group) if selected_group else []
         users = get_all_users(connection, domain_to_search_base(domain), session.get('options'))
-
+  
+        
         return render_template(
             'modify_group_members.html',
             groups=groups,
             members=members,
             selected_group=selected_group,
-            users=users
+            users=users,
+            options = session.get('options')
         )
     except Exception as e:
         flash_error(f"Nie można pobrać listy grup: {str(e)}")

@@ -36,12 +36,16 @@ def list_all_groups(conn, domain: str) -> tuple:
 
 def add_user_to_group(conn, username: str, users_domain :str, users_ou:str, group: str, group_domain:str, group_ou :str) -> bool:
     user = create_distinguished_name(username, users_domain, users_ou)
+    
     group = create_distinguished_name(group, group_domain, group_ou, is_group=True)
+    
     return conn.extend.microsoft.add_members_to_groups(user, group)
 
 def remove_user_from_group(conn, username: str, users_domain :str, users_ou:str, group: str, group_domain:str, group_ou :str) -> bool:
     user = create_distinguished_name(username, users_domain, users_ou)
+    
     group = create_distinguished_name(group, group_domain, group_ou, is_group=True)
+    
     return conn.extend.microsoft.remove_members_from_groups(user, group)
 
 def csv_adding_to_groups(conn, file_path: str) -> int:

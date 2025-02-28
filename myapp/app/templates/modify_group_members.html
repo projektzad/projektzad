@@ -17,40 +17,121 @@
 </form>
 
 <!-- Show Current Members if a Group is Selected -->
-{% if members %}
+{% if selected_group %}
 <h3>Current Members of {{ selected_group }}</h3>
 <form method="post">
     <input type="hidden" name="group_name" value="{{ selected_group }}">
-    
+
     <!-- Users to Add Section -->
-    <div class="form-group">
-        <label for="add_users">Users to Add</label>
-        <p>Select users to add:</p>
-        {% for user in users %}
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="add_users" value="{{ user }}" id="add_{{ loop.index }}">
-            <label class="form-check-label" for="add_{{ loop.index }}">
-                {{ user }}
-            </label>
-        </div>
-        {% endfor %}
-    </div>
+    <h4>Users to Add</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Username</th>
+                <th>Distinguished Name</th>
+                <th>Attributes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+                {% if user.distinguishedName not in members %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="add_users" value="{{ user.distinguishedName }}" id="add_{{ loop.index }}">
+                    </td>
+                    <td>{{ user.name if user.name else 'N/A' }}</td>
+                    <td>{{ user.distinguishedName if user.distinguishedName else 'N/A' }}</td>
+                    <td>
+                        <!-- Wyświetlanie atrybutów w formacie "nazwa_atrybutu: wartość" -->
+                        <div class="attributes-container">
+                            <button type="button" class="btn btn-info btn-sm toggle-attributes" 
+                                    data-toggle="collapse" 
+                                    data-target="#attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}">
+                                Show Attributes
+                            </button>
+                            <div id="attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}" class="collapse">
+                                <ul>
+                                    {% for key, value in user.items() %}
+                                        {% if key != 'name' and key != 'distinguishedName' %}
+                                            <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
 
     <!-- Users to Remove Section -->
-    <div class="form-group">
-        <label for="remove_users">Users to Remove</label>
-        <p>Select members to remove:</p>
-        {% for member in members %}
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="remove_users" value="{{ member }}" id="remove_{{ loop.index }}">
-            <label class="form-check-label" for="remove_{{ loop.index }}">
-                {{ member }}
-            </label>
-        </div>
-        {% endfor %}
-    </div>
+    <h4>Users to Remove</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Username</th>
+                <th>Distinguished Name</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+                {% if user.distinguishedName in members %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="remove_users" value="{{ user.distinguishedName }}" id="remove_{{ loop.index }}">
+                    </td>
+                    <td>{{ user.name if user.name else 'N/A' }}</td>
+                    <td>{{ user.distinguishedName if user.distinguishedName else 'N/A' }}</td>
+                    <td>
+                        <!-- Wyświetlanie atrybutów w formacie "nazwa_atrybutu: wartość" -->
+                        <div class="attributes-container">
+                            <button type="button" class="btn btn-info btn-sm toggle-attributes" 
+                                    data-toggle="collapse" 
+                                    data-target="#attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}">
+                                Show Attributes
+                            </button>
+                            <div id="attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}" class="collapse">
+                                <ul>
+                                    {% for key, value in user.items() %}
+                                        {% if key != 'name' and key != 'distinguishedName' %}
+                                            <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
 
     <button type="submit" class="btn btn-info">Modify Group</button>
 </form>
 {% endif %}
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+    const toggleButtons = document.querySelectorAll('.toggle-attributes');
+
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            const targetId = button.getAttribute('data-target');
+            const targetElement = document.querySelector(targetId);
+
+            // Sprawdź, czy element jest widoczny (ma klasę "show")
+            if (targetElement.classList.contains('show')) {
+                button.textContent = 'Show Attributes';  // Zmień tekst na "Show"
+            } else {
+                button.textContent = 'Hide Attributes';  // Zmień tekst na "Hide"
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
