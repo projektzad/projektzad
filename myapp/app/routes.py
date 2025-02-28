@@ -4,7 +4,7 @@ from werkzeug.utils import secure_filename
 import sys
 import os
 from datetime import datetime
-
+import re
 
 # Get the absolute path to the 'models' directory
 models_path = os.path.join(os.path.dirname(__file__), 'models')
@@ -12,19 +12,26 @@ models_path = os.path.join(os.path.dirname(__file__), 'models')
 # Append the path to sys.path
 sys.path.append(models_path)
 
+
 # Import the necessary modules and functions
 from app.models import connection as co
 from app.models.block import change_users_block_status,get_blocked_users_count
-from app.models.delete import delete_user_from_active_directory
+
 from app.models.all_users import get_all_users,get_all_users_count
-from app.models.batch_delete_users import delete_multiple_users
+
 from app.models.block import block_multiple_users
 from app.models.expire import expire_multiple_users,set_account_expiration,get_expiring_users_count
 from app.models.add import create_user
 from app.models.group_modify import add_user_to_group, remove_user_from_group,list_all_groups,list_group_members, remove_group, add_new_group, load_json_config
+from app.models.delete import *
+from app.models.batch_delete_users import *
+
 main_routes = Blueprint('main', __name__)
 
 connection_global = None
+
+def flash_error(message):
+    flash(message, 'danger')
 
 def domain_to_search_base(domain):
     # Split the domain string by the period (.)
@@ -32,9 +39,6 @@ def domain_to_search_base(domain):
     # Format the parts into the LDAP search base string
     search_base = ','.join(f"dc={part}" for part in domain_parts)
     return search_base
-
-
-import re
 
 def parse_user_data2(user_data):
     # Wydzielenie domeny (wszystkie DC=...) oraz OU=...
@@ -71,7 +75,22 @@ def parse_user_data(user_data):
 
     return ou, domain, cn
 
+@main_routes.route('/search_user', methods=['POST'])
+def search_user():
+    user_data = request.form.get('user_data', '').strip()
+    cn = user_data
+    conn = get_ldap_connection()
+    search_base = domain_to_search_base(domain=session.get('domain', 'default.local'))
+    user_list = get_all_users(conn, search_base)
 
+    # Filter users with a matching 'cn'
+    print(user_list)
+    matched_users = [user for user in user_list if cn.lower() in user.get("cn", "").lower()]
+
+    # Render the results in a template
+    return render_template('search_user.html', matched_users=matched_users)
+
+ 
 # Decorator requiring admin privileges
 def requires_admin(f):
     @wraps(f)
@@ -82,9 +101,6 @@ def requires_admin(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Helper function to manage errors
-def flash_error(message):
-    flash(message, 'danger')
 
 # Helper function to get LDAP connection
 def get_ldap_connection():
@@ -114,7 +130,6 @@ def index():
             flash(f"Wystąpił błąd: {str(e)}", "danger")
             return redirect(url_for('main.index'))
     return redirect(url_for('main.login'))
-
 
 
 @main_routes.route('/checkbox_form', methods=['GET', 'POST'])
@@ -169,7 +184,7 @@ def login():
         password = request.form['password']
         domain = request.form['domain']
         [is_connected, connection] = co.connect_to_active_directory(ldap_server, login, password, domain)
-        #print("Czy połaczaony:" , is_connected)
+        
         if is_connected:
             session['ldap_server'] = ldap_server
             session['login'] = login
@@ -193,233 +208,252 @@ def logout():
     session.pop('domain', None)
     return redirect(url_for('main.login'))
 
-
 @main_routes.route('/delete_user', methods=['GET', 'POST'])
 def delete_user():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
     connection = get_ldap_connection()  # Use the global LDAP connection
+    
     if request.method == 'POST':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
+        if 'selected_users' in request.form:
+            return delete_user_post(connection)
+        elif 'file' in request.files:
+            return delete_user_file(connection)
+    
+    return delete_user_get(connection)
 
-        if 'selected_users' in request.form:  # For selected users (checkbox method)
-            selected_users = request.form.getlist('selected_users')
-            if not selected_users:
-                flash_error("Nie wybrano żadnych użytkowników do usunięcia.")
-                return redirect(url_for('main.delete_user'))  # Redirect back to the same page
+def delete_user_get(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
+    try:
+        # Fetch user list for the form
+        domain = session.get('domain', 'default.local')
+        #print("Domain:", domain)
+        search_base = domain_to_search_base(domain)
+        #print("Search Base:", search_base)
+        
+        selected = session.get('options')
+        if selected:
+            users = get_all_users(connection, search_base, selected)
+        else:
+            users = get_all_users(connection, search_base)
+        
+        print(users)
+        return render_template('delete_user.html', users=users, options=selected)
+    except Exception as e:
+        flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
+        return redirect(url_for('main.index'))
 
-            errors = []
-            successes = []
-            for user_data in selected_users:
-                print("USER DATA FROM DELETE:",user_data)
-                try:
-                    username, domain = user_data.split('|')
-                    ou, domain, cn = parse_user_data(domain)
-                    if ou:
-                        success = delete_user_from_active_directory(connection, username, domain, ou)
-                    else:
-                        success = delete_user_from_active_directory(connection, username, domain)
+def delete_user_post(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
 
-                    if success:
-                        successes.append(username)
-                    else:
-                        errors.append(username)
-                except ValueError:
-                    errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
+    selected_users = request.form.getlist('selected_users')
+    if not selected_users:
+        flash_error("Nie wybrano żadnych użytkowników do usunięcia.")
+        return redirect(url_for('main.delete_user'))
 
-            # Handle success and errors
-            if successes:
-                flash(f"Użytkownicy {', '.join(successes)} zostali pomyślnie usunięci.", 'success')
-            if errors:
-                flash_error(f"Wystąpiły błędy podczas usuwania użytkowników: {', '.join(errors)}.")
+    errors = []
+    successes = []
 
-        elif 'file' in request.files:  # Handle file upload
-            file = request.files['file']
-            if file.filename == '':
-                flash_error("Nie wybrano pliku do przesłania.")
-                return redirect(url_for('main.delete_user'))
+    for user_data in selected_users:
+        try:
+            username, domain = user_data.split('|')
+            ou, domain, _ = parse_user_data(domain)
+            if ou:
+                success = delete_user_from_active_directory(connection, username, domain, ou)
+            else:
+                success = delete_user_from_active_directory(connection, username, domain)
 
-            file_path = os.path.join("uploads", file.filename)
-            file.save(file_path)
+            if success:
+                successes.append(username)
+            else:
+                errors.append(username)
+        except ValueError:
+            errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
 
-            # Process file based on type (Excel or CSV)
-            try:
-                if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
-                    deleted_count = delete_multiple_users(connection, file_path)
-                else:
-                    flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
-                    return redirect(url_for('main.delete_user'))
+    # Handle success and errors
+    if successes:
+        flash(f"Użytkownicy {', '.join(successes)} zostali pomyślnie usunięci.", 'success')
+    if errors:
+        flash_error(f"Wystąpiły błędy podczas usuwania użytkowników: {', '.join(errors)}.")
 
-                flash(f"Usunięto {deleted_count} użytkowników z pliku.", 'success')
-            except Exception as e:
-                flash_error(f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}")
+    return redirect(url_for('main.delete_user'))
 
+def delete_user_file(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash_error("Nie wybrano pliku do przesłania.")
+        return redirect(url_for('main.delete_user'))
+
+    file_path = os.path.join("uploads", file.filename)
+    file.save(file_path)
+
+    try:
+        if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
+            deleted_count = delete_multiple_users(connection, file_path)
+        else:
+            flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
             return redirect(url_for('main.delete_user'))
 
-        return redirect(url_for('main.delete_user'))  # Always return a redirect after POST
+        flash(f"Usunięto {deleted_count} użytkowników z pliku.", 'success')
+    except Exception as e:
+        flash_error(f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}")
 
-    elif request.method == 'GET':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
-
-        try:
-            # Fetch user list for the form
-            domain = session.get('domain', 'default.local')
-            print("Domain:", domain)
-            search_base = domain_to_search_base(domain)
-            print("Search Base:", search_base)
-            #search_base = "dc=testad,dc=local"
-            selected = session.get('options')
-            if selected:
-                users = get_all_users(connection, search_base,selected)
-                print(users)
-            else:
-                users = get_all_users(connection, search_base)
-            print(users)
-            print(session.get('options'))
-            return render_template('delete_user.html', users=users, options=session.get('options'))
-        except Exception as e:
-            
-            flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
-            return redirect(url_for('main.index'))
-
+    return redirect(url_for('main.delete_user'))
 
 @main_routes.route('/add_user', methods=['GET', 'POST'])
-#@requires_admin
 def add_user():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
     if request.method == 'POST':
-        username = request.form.get('username')
-        first_name = request.form.get('first_name')
-        last_name = request.form.get('last_name')
-        password = request.form.get('password')
-        ou = request.form.get('ou')
+        return add_user_post()
 
-        if not validate_form([username, first_name, last_name, password, ou]):
-            flash_error("Wszystkie pola są wymagane.")
-            return render_template('add_user.html')
+    return add_user_get()
 
-        connection = get_ldap_connection()
-        if not connection:
-            return redirect(url_for('main.login'))
+def add_user_get():
+    return render_template('add_user.html')
 
-        try:
-            print(domain_to_search_base(session.get('domain')))
-            success = create_user(connection, username, first_name, last_name, password, ou, domain_to_search_base(session.get('domain')))
-            if success:
-                flash(f"Użytkownik {username} został pomyślnie dodany.", "success")
-            else:
-                flash_error(f"Nie udało się dodać użytkownika {username}.")
-        except Exception as e:
-            flash_error(f"Wystąpił błąd: {str(e)}")
-            return redirect(url_for('main.index'))
+def add_user_post():
+    # Pobierz dane z formularza
+    username = request.form.get('username')
+    first_name = request.form.get('first_name')
+    last_name = request.form.get('last_name')
+    password = request.form.get('password')
+    ou = request.form.get('ou')
 
+    # Walidacja danych
+    if not validate_form([username, first_name, last_name, password, ou]):
+        flash_error("Wszystkie pola są wymagane.")
+        return render_template('add_user.html')
+
+    # Połączenie z LDAP
+    connection = get_ldap_connection()
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
+
+    try:
+        # Tworzenie użytkownika
+        search_base = domain_to_search_base(session.get('domain'))
+        success = create_user(connection, username, first_name, last_name, password, ou, search_base)
+        if success:
+            flash(f"Użytkownik {username} został pomyślnie dodany.", "success")
+        else:
+            flash_error(f"Nie udało się dodać użytkownika {username}.")
+    except Exception as e:
+        flash_error(f"Wystąpił błąd: {str(e)}")
         return redirect(url_for('main.index'))
 
-    return render_template('add_user.html')
+    return redirect(url_for('main.index'))
 
 
 @main_routes.route('/toggle_block_user', methods=['GET', 'POST'])
 def toggle_block_user():
-    # Check if the user is logged in
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    connection = get_ldap_connection()  # Get the LDAP connection
+    connection = get_ldap_connection()
 
-    # If the request is POST, process the form
     if request.method == 'POST':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
+        if 'selected_users' in request.form:
+            return toggle_block_user_post(connection)
+        elif 'file' in request.files:
+            return toggle_block_user_file(connection)
+    
+    return toggle_block_user_get(connection)
+def toggle_block_user_get(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
 
-        # Handle the form for selected users
-        selected_users = request.form.getlist('selected_users')  # List of selected users
-       
-        if selected_users:
-            errors = []
-            successes = []
-            for user_data in selected_users:
-                try:
-                    
-                    username, domain = user_data.split('|')
-                    
-                    ou, domain, cn = parse_user_data(domain)
-           
-                 
-                    if ou:
-                        success = change_users_block_status(connection, username, domain, ou)
-                    else:
-                        # Jeśli OU jest puste, przekazujemy tylko username i domain
-                        success = change_users_block_status(connection, username, domain)
-                    if success:
-                        successes.append(username)
-                    else:
-                        errors.append(username)
-                except ValueError:
-                    errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
-
-            # Handle success and errors
-            if successes:
-                flash(f"Status blokady użytkowników {', '.join(successes)} został zmieniony.", "success")
-            if errors:
-                flash_error(f"Wystąpiły błędy podczas zmiany statusu blokady użytkowników: {', '.join(errors)}.")
+    try:
+        domain = session.get('domain', 'default.local')
+        search_base = domain_to_search_base(domain)
+        selected = session.get('options')
         
-        # Handle the file upload section
-        if 'file' in request.files:  # Handle file upload
-            file = request.files['file']
-            if file.filename == '':
-                flash_error("Nie wybrano pliku do przesłania.")
-                return redirect(url_for('main.toggle_block_user'))
-            
-            # Save the file to a temporary location
-            file_path = os.path.join("uploads", secure_filename(file.filename))
-            file.save(file_path)
+        if selected:
+            users = get_all_users(connection, search_base, selected)
+        else:
+            users = get_all_users(connection, search_base)
+        
+        return render_template('block_user.html', users=users, options=selected)
+    except Exception as e:
+        flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
+        return redirect(url_for('main.index'))
+def toggle_block_user_post(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
 
-            # Process file based on type (Excel or CSV)
-            try:
-                if (file.filename.endswith('.xlsx') or file.filename.endswith('.csv')) :
-                    blocked_count = block_multiple_users(connection,file_path)
-                else:
-                    flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
-                    return redirect(url_for('main.toggle_block_user'))
-                
-                if blocked_count:
-                    flash(f"{blocked_count} użytkowników zostało pomyślnie zablokowanych/odblokowanych z pliku.", 'success')
-                else:
-                    flash_error("Wystąpił błąd podczas przetwarzania pliku.")
+    selected_users = request.form.getlist('selected_users')
+    if not selected_users:
+        flash_error("Nie wybrano żadnych użytkowników.")
+        return redirect(url_for('main.toggle_block_user'))
 
-            except Exception as e:
-                flash_error(f"Nie udało się przetworzyć pliku: {str(e)}")
+    errors = []
+    successes = []
 
-        return redirect(url_for('main.toggle_block_user'))  # Always return a redirect after POST
-
-    # If the request is GET, show the block user form
-    elif request.method == 'GET':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
+    for user_data in selected_users:
         try:
-            # Fetch user list for the form
-            domain = session.get('domain', 'default.local')
-            search_base = domain_to_search_base(domain)
-            selected = session.get('options')
-            if selected:
-                users = get_all_users(connection, search_base, selected)
+            username, domain = user_data.split('|')
+            ou, domain, cn = parse_user_data(domain)
+
+            if ou:
+                success = change_users_block_status(connection, username, domain, ou)
             else:
-                users = get_all_users(connection, search_base)
-            
-            return render_template('block_user.html', users=users,options=session.get('options'))
-        except Exception as e:
-            
-            flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
-            return redirect(url_for('main.index'))
+                success = change_users_block_status(connection, username, domain)
+
+            if success:
+                successes.append(username)
+            else:
+                errors.append(username)
+        except ValueError:
+            errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
+
+    # Komunikaty o sukcesie i błędach
+    if successes:
+        flash(f"Status blokady użytkowników {', '.join(successes)} został zmieniony.", "success")
+    if errors:
+        flash_error(f"Wystąpiły błędy podczas zmiany statusu blokady: {', '.join(errors)}.")
+
+    return redirect(url_for('main.toggle_block_user'))
+def toggle_block_user_file(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash_error("Nie wybrano pliku do przesłania.")
+        return redirect(url_for('main.toggle_block_user'))
+
+    file_path = os.path.join("uploads", secure_filename(file.filename))
+    file.save(file_path)
+
+    try:
+        if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
+            blocked_count = block_multiple_users(connection, file_path)
+        else:
+            flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
+            return redirect(url_for('main.toggle_block_user'))
+
+        if blocked_count:
+            flash(f"{blocked_count} użytkowników zostało pomyślnie zablokowanych/odblokowanych z pliku.", 'success')
+        else:
+            flash_error("Wystąpił błąd podczas przetwarzania pliku.")
+    except Exception as e:
+        flash_error(f"Nie udało się przetworzyć pliku: {str(e)}")
+
+    return redirect(url_for('main.toggle_block_user'))
 
 
 @main_routes.route('/expire_user', methods=['GET', 'POST'])
@@ -429,187 +463,228 @@ def expire_user():
         return redirect(url_for('main.login'))
 
     connection = get_ldap_connection()  # Get the LDAP connection
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
 
-    # If the request is POST, process the form
     if request.method == 'POST':
-        # Handle the form for selected users
-        selected_users = request.form.getlist('selected_users') 
-        if selected_users:
-            errors = []
-            successes = []
-            for user_data in selected_users:
-                try:
-                    username, domain = user_data.split('|')
-                    ou, domain, cn = parse_user_data(domain)
-                    expiration_date = request.form.get('expiration_date')
-                    formatted_date = datetime.strptime(expiration_date, '%Y-%m-%d').strftime('%d-%m-%Y')
-                    print(expiration_date)
-                    if ou:
-                        success = set_account_expiration(connection, username, domain,formatted_date,ou)
-                    else:
-                        success = set_account_expiration(connection, username, domain, formatted_date)
-                    if success:
-                        successes.append(username)
-                    else:
-                        errors.append(username)
-                except ValueError:
-                    errors.append(f"Nieprawidłowy format danych użytkownika!!: {user_data}")
-
-            # Handle success and errors
-            if successes:
-                flash(f"Status expire użytkowników {', '.join(successes)} został zmieniony.", "success")
-            if errors:
-                flash_error(f"Wystąpiły błędy podczas zmiany statusu expire użytkowników: {', '.join(errors)}.")
-        
-        # Handle the file upload section
-        if 'file' in request.files:  # Handle file upload
-            file = request.files['file']
-            if file.filename == '':
-                flash_error("Nie wybrano pliku do przesłania.")
-                return redirect(url_for('main.expire_user'))
-            
-            # Save the file to a temporary location
-            file_path = os.path.join("uploads", secure_filename(file.filename))
-            file.save(file_path)
-
-            # Process file based on type (Excel or CSV)
-            try:
-                if (file.filename.endswith('.xlsx') or file.filename.endswith('.csv')) :
-                    blocked_count = expire_multiple_users(connection,file_path)
-                else:
-                    flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
-                    return redirect(url_for('main.toggle_expire'))
-                
-                if blocked_count:
-                    flash(f"{blocked_count} użytkowników zostało pomyślnie zablokowanych/odblokowanych z pliku.", 'success')
-                else:
-                    flash_error("Wystąpił błąd podczas przetwarzania pliku.")
-
-            except Exception as e:
-                flash_error(f"Nie udało się przetworzyć pliku: {str(e)}")
-
-        return redirect(url_for('main.expire_user'))  # Always return a redirect after POST
-
-    # If the request is GET, show the block user form
+        return handle_post_request(connection)
     elif request.method == 'GET':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
+        return handle_get_request(connection)
 
+
+def handle_post_request(connection):
+    """Handle POST requests for expiring users."""
+    # Handle form submissions
+    if request.form.getlist('selected_users'):
+        return handle_selected_users(connection)
+
+    # Handle file upload
+    if 'file' in request.files:
+        return handle_file_upload(connection)
+
+    return redirect(url_for('main.expire_user'))  # Redirect after processing POST
+
+
+def handle_selected_users(connection):
+    """Process the form for selected users."""
+    selected_users = request.form.getlist('selected_users')
+    errors = []
+    successes = []
+
+    for user_data in selected_users:
         try:
-            # Fetch user list for the form
-            #search_base = "dc=testad,dc=local"
-            domain = session.get('domain', 'testad.local')
-            search_base = domain_to_search_base(domain)
-            selected = session.get('options')
-            if selected:
-                users = get_all_users(connection, search_base,selected)
+            username, domain = user_data.split('|')
+            ou, domain, cn = parse_user_data(domain)
+            expiration_date = request.form.get('expiration_date')
+            formatted_date = datetime.strptime(expiration_date, '%Y-%m-%d').strftime('%d-%m-%Y')
+            print(expiration_date)
+
+            # Set account expiration
+            if ou:
+                success = set_account_expiration(connection, username, domain, formatted_date, ou)
             else:
-                users = get_all_users(connection, search_base)
-            return render_template('expire_user.html', users=users,options=session.get('options'))
-        except Exception as e:
-            flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
-            return redirect(url_for('main.index'))
+                success = set_account_expiration(connection, username, domain, formatted_date)
+
+            if success:
+                successes.append(username)
+            else:
+                errors.append(username)
+        except ValueError:
+            errors.append(f"Nieprawidłowy format danych użytkownika!!: {user_data}")
+
+    # Flash success and error messages
+    if successes:
+        flash(f"Status expire użytkowników {', '.join(successes)} został zmieniony.", "success")
+    if errors:
+        flash_error(f"Wystąpiły błędy podczas zmiany statusu expire użytkowników: {', '.join(errors)}.")
+
+    return redirect(url_for('main.expire_user'))
+
+
+def handle_file_upload(connection):
+    """Handle file upload for expiring multiple users."""
+    file = request.files['file']
+    if file.filename == '':
+        flash_error("Nie wybrano pliku do przesłania.")
+        return redirect(url_for('main.expire_user'))
+
+    # Save the file to a temporary location
+    file_path = os.path.join("uploads", secure_filename(file.filename))
+    file.save(file_path)
+
+    # Process file based on type (Excel or CSV)
+    try:
+        if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
+            blocked_count = expire_multiple_users(connection, file_path)
+        else:
+            flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
+            return redirect(url_for('main.expire_user'))
+
+        if blocked_count:
+            flash(f"{blocked_count} użytkowników zostało pomyślnie zablokowanych/odblokowanych z pliku.", 'success')
+        else:
+            flash_error("Wystąpił błąd podczas przetwarzania pliku.")
+
+    except Exception as e:
+        flash_error(f"Nie udało się przetworzyć pliku: {str(e)}")
+
+    return redirect(url_for('main.expire_user'))
+
+
+def handle_get_request(connection):
+    """Handle GET requests for displaying the expire user form."""
+    try:
+        # Fetch user list for the form
+        domain = session.get('domain', 'testad.local')
+        search_base = domain_to_search_base(domain)
+        selected = session.get('options')
+
+        if selected:
+            users = get_all_users(connection, search_base, selected)
+        else:
+            users = get_all_users(connection, search_base)
+
+        return render_template('expire_user.html', users=users, options=session.get('options'))
+    except Exception as e:
+        flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
+        return redirect(url_for('main.index'))
+
 
 @main_routes.route('/modify_group_members', methods=['GET', 'POST'])
 def modify_group_members():
+    """Main route to modify group members."""
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    connection = get_ldap_connection()  # Get the LDAP connection
+    connection = get_ldap_connection()
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
 
     if request.method == 'POST':
-        # Retrieve form data
-        group_name = request.form.get('group_name')
-        add_users = request.form.getlist('add_users')
-        remove_users = request.form.getlist('remove_users')
+        return handle_post_group_modification(connection)
+    elif request.method == 'GET':
+        return handle_get_group_modification(connection)
 
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.modify_group_members'))
 
-        errors = []  # Track failed operations
-        successes = []  # Track successful operations
+def handle_post_group_modification(connection):
+    """Handle POST request for modifying group members."""
+    group_name = request.form.get('group_name')
+    add_users = request.form.getlist('add_users')
+    remove_users = request.form.getlist('remove_users')
 
-        # Fetch the groups and corresponding OUs
+    domain = session.get('domain', 'company.com')
+    groups, oulist = list_all_groups(connection, domain)
+    group_ou = get_group_ou(group_name, groups, oulist)
+
+    errors, successes = [], []
+
+    # Process adding users
+    process_user_addition(connection, add_users, domain, group_name, group_ou, successes, errors)
+    
+    # Process removing users
+    process_user_removal(connection, remove_users, domain, group_name, group_ou, successes, errors)
+    
+    # Display results
+    display_results(successes, errors)
+    return redirect(url_for('main.modify_group_members'))
+
+
+def get_group_ou(group_name, groups, oulist):
+    """Get the corresponding OU for the selected group."""
+    if group_name in groups:
+        return oulist[groups.index(group_name)]
+    return None
+
+
+def process_user_addition(connection, add_users, domain, group_name, group_ou, successes, errors):
+    """Process adding users to a group."""
+    for username in add_users:
+        try:
+            if username:
+                domain2, users_ou, cn = parse_user_data2(username)
+                print(cn, domain, users_ou, group_name, domain, domain)
+                success = add_user_to_group(connection, cn, domain, users_ou, group_name, domain, group_ou)
+                if success:
+                    successes.append(username)
+                else:
+                    errors.append(username)
+        except Exception as e:
+            errors.append(f"Nie udało się dodać użytkownika {username}: {str(e)}")
+
+
+def process_user_removal(connection, remove_users, domain, group_name, group_ou, successes, errors):
+    """Process removing users from a group."""
+    for username in remove_users:
+        try:
+            if username:
+                domain2, users_ou, cn = parse_user_data2(username)
+                print(cn, users_ou, group_name, domain)
+                success = remove_user_from_group(connection, cn, domain, users_ou, group_name, domain, group_ou)
+                if success:
+                    successes.append(username)
+                else:
+                    errors.append(username)
+        except Exception as e:
+            errors.append(f"Nie udało się usunąć użytkownika {username}: {str(e)}")
+
+
+def display_results(successes, errors):
+    """Display flash messages for successes and errors."""
+    if successes:
+        flash(f"Zmodyfikowano członków grupy: {', '.join(successes)}.", "success")
+    if errors:
+        flash_error(f"Wystąpiły błędy podczas modyfikacji członków grupy: {', '.join(errors)}.")
+
+
+def handle_get_group_modification(connection):
+    """Handle GET request for displaying group modification form."""
+    try:
         domain = session.get('domain', 'company.com')
         groups, oulist = list_all_groups(connection, domain)
+        selected_group = request.args.get('group_name')
+        members = list_group_members(connection, domain, selected_group) if selected_group else []
+        users = get_all_users(connection, domain_to_search_base(domain), session.get('options'))
 
-        # Map the selected group name to its corresponding OU
-        group_ou = None
-        if group_name in groups:
-            group_ou = oulist[groups.index(group_name)]  # Get the corresponding OU
-
-        domain2, group_ou, group_cn = parse_user_data2(group_ou)
-        # Add users to the group
-        for username in add_users:
-            try:
-                if username: 
-                    domain2, users_ou, cn = parse_user_data2(username)
-                    print(cn, domain, users_ou, group_name, domain, domain)
-                    success = add_user_to_group(connection,cn, domain, users_ou, group_name, domain, group_ou)
-                    
-                    if success:
-                        successes.append(username)
-                    else:
-                        errors.append(username)
-            except Exception as e:
-                errors.append(f"Nie udało się dodać użytkownika {username}: {str(e)}")
-
-        # Remove users from the group
-        for username in remove_users:
-            try:
-                if username:  # Skip empty inputs
-                    # Parse user data for domain and OU
-                    domain2, users_ou, cn = parse_user_data2(username)
-                    print(cn, users_ou, group_name, domain)
-                    success = remove_user_from_group(connection,cn, domain, users_ou, group_name, domain, group_ou)
-                    if success:
-                        successes.append(username)
-                    else:
-                        errors.append(username)
-            except Exception as e:
-                errors.append(f"Nie udało się usunąć użytkownika {username}: {str(e)}")
-
-        # Handle results
-        if successes:
-            flash(f"Zmodyfikowano członków grupy: {', '.join(successes)}.", "success")
-        if errors:
-            flash_error(f"Wystąpiły błędy podczas modyfikacji członków grupy: {', '.join(errors)}.")
-
-        # Redirect after POST to avoid duplicate form submissions
-        return redirect(url_for('main.modify_group_members'))
-
-    elif request.method == 'GET':
-        try:
-            # Fetch domain and groups
-            domain = session.get('domain', 'company.com')
-            groups, oulist = list_all_groups(connection, domain)
-
-            # Fetch selected group and its members
-            selected_group = request.args.get('group_name')
-            members = list_group_members(connection, domain, selected_group) if selected_group else []
-
-            # Fetch all users for adding
-            users = get_all_users(connection, domain_to_search_base(domain), session.get('options'))
-
-            return render_template(
-                'modify_group_members.html',
-                groups=groups,
-                members=members,
-                selected_group=selected_group,
-                users=users  # Pass the list of users to the template
-            )
-        except Exception as e:
-            flash_error(f"Nie można pobrać listy grup: {str(e)}")
-            return redirect(url_for('main.index'))
+        return render_template(
+            'modify_group_members.html',
+            groups=groups,
+            members=members,
+            selected_group=selected_group,
+            users=users
+        )
+    except Exception as e:
+        flash_error(f"Nie można pobrać listy grup: {str(e)}")
+        return redirect(url_for('main.index'))
 
 @main_routes.route('/groups_management', methods=['GET', 'POST'])
 def groups_management():
+    """Main route for group management."""
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    connection = get_ldap_connection()  # Establish the LDAP connection
+    connection = get_ldap_connection()
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
         return redirect(url_for('main.index'))
@@ -617,70 +692,83 @@ def groups_management():
     domain = session.get('domain', 'company.com')
 
     if request.method == 'POST':
-        action = request.form.get('action')  # Determine if adding or deleting
-        group_name = request.form.get('group_name')
+        return handle_post_group_management(connection, domain)
+    else:
+        return handle_get_group_management(connection, domain)
 
-        if not group_name:
-            flash_error("Group name cannot be empty.")
-            return redirect(url_for('main.groups_management'))
 
-        if action == 'add':
-            try:
-                # Load configuration for the new group
-                config_path = os.path.abspath('./app/templates/group-config.json')
-                
-                config = load_json_config(config_path)
+def handle_post_group_management(connection, domain):
+    """Handle POST requests for group management."""
+    action = request.form.get('action')
+    group_name = request.form.get('group_name')
 
-                # Attempt to add the group
-                success = add_new_group(connection, config)
-                if success:
-                    flash(f"Group '{group_name}' added successfully.", "success")
-                else:
-                    flash_error(f"Failed to add group '{group_name}'. Check the logs for more details.")
-            except FileNotFoundError:
-                flash_error(f"Configuration file not found at at at '{config_path}'.")
-            except KeyError as ke:
-                flash_error(f"Configuration is missing a required field: {str(ke)}")
-            except Exception as e:
-                flash_error(f"Error while adding group '{group_name}': {str(e)}")
-
-        elif action == 'delete':
-            try:
-                print("Iam here")
-                # Fetch group details to get the correct OU
-                groups, oulist = list_all_groups(connection, domain)
-                group_ou = oulist[groups.index(group_name)] if group_name in groups else None
-
-                if not group_ou:
-                    flash_error(f"Group '{group_name}' not found.")
-                    return redirect(url_for('main.groups_management'))
-
-                _, group_ou, _ = parse_user_data2(group_ou)
-
-                # Attempt to delete the group
-                print(group_name ,"+", domain , "+", group_ou, "+")
-                success = remove_group(connection, group_name, domain, group_ou)  # Implement this function
-                if success:
-                    flash(f"Group '{group_name}' deleted successfully.", "success")
-                else:
-                    flash_error(f"Failed to delete group '{group_name}'.")
-            except ValueError:
-                flash_error(f"Group '{group_name}' not found in the domain.")
-            except Exception as e:
-                flash_error(f"Error while deleting group '{group_name}': {str(e)}")
-
-        # Redirect to refresh the group list
+    if not group_name:
+        flash_error("Group name cannot be empty.")
         return redirect(url_for('main.groups_management'))
 
-    # Handle GET request: Retrieve and display the list of groups
+    if action == 'add':
+        return add_group(connection, group_name)
+    elif action == 'delete':
+        return delete_group(connection, domain, group_name)
+
+    flash_error("Nieznana akcja.")
+    return redirect(url_for('main.groups_management'))
+
+
+def add_group(connection, group_name):
+    """Handle adding a new group."""
     try:
-        groups, _ = list_all_groups(connection, domain)  # Fetch all groups
+        config_path = os.path.abspath('./app/templates/group-config.json')
+        config = load_json_config(config_path)
+
+        success = add_new_group(connection, config)
+        if success:
+            flash(f"Group '{group_name}' added successfully.", "success")
+        else:
+            flash_error(f"Failed to add group '{group_name}'. Check the logs for more details.")
+    except FileNotFoundError:
+        flash_error(f"Configuration file not found at '{config_path}'.")
+    except KeyError as ke:
+        flash_error(f"Configuration is missing a required field: {str(ke)}")
+    except Exception as e:
+        flash_error(f"Error while adding group '{group_name}': {str(e)}")
+
+    return redirect(url_for('main.groups_management'))
+
+
+def delete_group(connection, domain, group_name):
+    """Handle deleting a group."""
+    try:
+        groups, oulist = list_all_groups(connection, domain)
+        group_ou = oulist[groups.index(group_name)] if group_name in groups else None
+
+        if not group_ou:
+            flash_error(f"Group '{group_name}' not found.")
+            return redirect(url_for('main.groups_management'))
+
+        _, group_ou, _ = parse_user_data2(group_ou)
+
+        success = remove_group(connection, group_name, domain, group_ou)
+        if success:
+            flash(f"Group '{group_name}' deleted successfully.", "success")
+        else:
+            flash_error(f"Failed to delete group '{group_name}'.")
+    except ValueError:
+        flash_error(f"Group '{group_name}' not found in the domain.")
+    except Exception as e:
+        flash_error(f"Error while deleting group '{group_name}': {str(e)}")
+
+    return redirect(url_for('main.groups_management'))
+
+
+def handle_get_group_management(connection, domain):
+    """Handle GET request for displaying groups list."""
+    try:
+        groups, _ = list_all_groups(connection, domain)
         return render_template('groups_management.html', groups=groups)
     except Exception as e:
         flash_error(f"Nie można pobrać listy grup: {str(e)}")
         return redirect(url_for('main.index'))
-
-
 
 
 @main_routes.app_errorhandler(404)

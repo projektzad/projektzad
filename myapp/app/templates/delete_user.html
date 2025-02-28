@@ -20,18 +20,20 @@
                         <!-- Checkbox for selecting users -->
                         <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.distinguishedName }}">
                     </td>
-                    <td>{{ user.name }}</td>
-                    <td>{{ user.distinguishedName }}</td>
+                    <td>{{ user.name if user.name else 'N/A' }}</td>
+                    <td>{{ user.distinguishedName if user.distinguishedName else 'N/A' }}</td>
                     <td>
                         <!-- Wyświetlanie atrybutów w formacie "nazwa_atrybutu: wartość" -->
                         <div class="attributes-container">
-                            <button type="button" class="btn btn-info btn-sm toggle-attributes" data-toggle="collapse" data-target="#attributes-{{ user.cn }}">
-                                Show/Hide Attributes
+                            <button type="button" class="btn btn-info btn-sm toggle-attributes" 
+                                    data-toggle="collapse" 
+                                    data-target="#attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}">
+                                Show Attributes
                             </button>
-                            <div id="attributes-{{ user.cn }}" class="collapse">
+                            <div id="attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}" class="collapse">
                                 <ul>
                                     {% for key, value in user.items() %}
-                                    {% if key != 'name' and key != 'distinguishedName' %}
+                                        {% if key != 'name' and key != 'distinguishedName' %}
                                             <li><strong>{{ key }}:</strong> {{ value }}</li>
                                         {% endif %}
                                     {% endfor %}
@@ -57,15 +59,20 @@
     </form>
 
     <script>
-        // JavaScript to enable the collapsing behavior for the attributes section
         document.addEventListener('DOMContentLoaded', function () {
             const toggleButtons = document.querySelectorAll('.toggle-attributes');
-            
+
             toggleButtons.forEach(button => {
                 button.addEventListener('click', function () {
                     const targetId = button.getAttribute('data-target');
                     const targetElement = document.querySelector(targetId);
-                    targetElement.classList.toggle('collapse');
+
+                    // Check if the target element is currently collapsed or visible
+                    if (targetElement.classList.contains('collapse')) {
+                        button.textContent = 'Hide Attributes';  // Change button text to "Hide"
+                    } else {
+                        button.textContent = 'Show Attributes';  // Change button text to "Show"
+                    }
                 });
             });
         });
