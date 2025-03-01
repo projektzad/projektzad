@@ -4,7 +4,7 @@
     <h2>Delete Users</h2>
     <!-- Form for selecting users -->
     <form method="post">
-        <input type="text" id="search" class="form-control" placeholder="Search users...">
+        <input type="text" id="searchAdd" class="form-control" placeholder="Search users...">
         <table class="table" id="userTable">
             <thead>
                 <tr>
@@ -66,14 +66,13 @@
                 button.addEventListener('click', function () {
                     const targetId = button.getAttribute('data-target');
                     const targetElement = document.querySelector(targetId);
-                    targetElement.classList.toggle('show');
-                    button.textContent = targetElement.classList.contains('show') ? 'Hide Attributes' : 'Show Attributes';
+                    button.textContent = targetElement.classList.contains('show') ? 'Show Attributes' : 'Hide Attributes';
                 });
             });
         });
 
-        document.getElementById('search').addEventListener('keyup', function () {
-            filterTable('search', 'userTable');
+        document.getElementById('searchAdd').addEventListener('keyup', function () {
+            filterTable('searchAdd', 'userTable');
         });
 
         function filterTable(inputId, tableId) {

@@ -81,12 +81,13 @@ def search_user():
     cn = user_data
     conn = get_ldap_connection()
     search_base = domain_to_search_base(domain=session.get('domain', 'default.local'))
-    user_list = get_all_users(conn, search_base)
+    user_list = get_all_users(conn, search_base,session.get('options'))
 
     # Filter users with a matching 'cn'
     print(user_list)
     matched_users = [user for user in user_list if cn.lower() in user.get("cn", "").lower()]
-
+    print("MatcherUsers")
+    print(matched_users)
     # Render the results in a template
     return render_template('search_user.html', matched_users=matched_users)
 

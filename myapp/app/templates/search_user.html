@@ -6,36 +6,36 @@
 
     {% if matched_users %}
     <form method="post">
-        <table class="table">
+        <table class="table" id="userTable">
             <thead>
                 <tr>
                     <th>Select</th>
-                    <th>Common Name (CN)</th>
-                    
-                    <th>Attributes</th> <!-- Column for displaying attributes -->
+                    <th>Username</th>
+                    <th>Domain</th>
+                    <th>Attributes</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in matched_users %}
                 <tr>
                     <td>
-                        <!-- Checkbox for selecting users -->
                         <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.distinguishedName }}">
                     </td>
-                    <td>{{ user.cn }}</td>
-                
+                    <td>{{ user.name if user.name else 'N/A' }}</td>
+                    <td>{{ user.distinguishedName if user.distinguishedName else 'N/A' }}</td>
                     <td>
-                        <!-- Display attributes in a collapsible format -->
                         <div class="attributes-container">
-                            <button type="button" class="btn btn-info btn-sm toggle-attributes" data-toggle="collapse" data-target="#attributes-{{ user.cn }}">
-                                Show/Hide Attributes
+                            <button type="button" class="btn btn-info btn-sm toggle-attributes" 
+                                    data-toggle="collapse" 
+                                    data-target="#attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}">
+                                Show Attributes
                             </button>
-                            <div id="attributes-{{ user.cn }}" class="collapse">
+                            <div id="attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}" class="collapse">
                                 <ul>
                                     {% for key, value in user.items() %}
-                                    {% if key != 'cn' and key != 'mail' and key != 'department' %}
-                                        <li><strong>{{ key }}:</strong> {{ value }}</li>
-                                    {% endif %}
+                                        {% if key != 'name' and key != 'distinguishedName' %}
+                                            <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                        {% endif %}
                                     {% endfor %}
                                 </ul>
                             </div>
