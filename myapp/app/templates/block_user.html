@@ -2,29 +2,27 @@
 
 {% block content %}
     <h2>Block/Unblock Users</h2>
-
+    <input type="text" id="searchAdd" class="form-control" placeholder="Search users...">
     <!-- Form for selecting users to block/unblock -->
     <form method="post">
-        <table class="table">
+        <table class="table" id="userTable">
             <thead>
                 <tr>
                     <th>Select</th>
                     <th>Username</th>
                     <th>Domain</th>
-                    <th>Attributes</th> <!-- Nowa kolumna dla atrybutów -->
+                    <th>Attributes</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
                 <tr>
                     <td>
-                        <!-- Checkbox for selecting users -->
                         <input type="checkbox" name="selected_users" value="{{ user.cn }}|{{ user.distinguishedName }}">
                     </td>
                     <td>{{ user.name if user.name else 'N/A' }}</td>
                     <td>{{ user.distinguishedName if user.distinguishedName else 'N/A' }}</td>
                     <td>
-                        <!-- Wyświetlanie atrybutów w formacie "nazwa_atrybutu: wartość" -->
                         <div class="attributes-container">
                             <button type="button" class="btn btn-info btn-sm toggle-attributes" 
                                     data-toggle="collapse" 
@@ -62,20 +60,36 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const toggleButtons = document.querySelectorAll('.toggle-attributes');
-
             toggleButtons.forEach(button => {
                 button.addEventListener('click', function () {
                     const targetId = button.getAttribute('data-target');
                     const targetElement = document.querySelector(targetId);
-
-                    // Check if the target element is currently collapsed or visible
-                    if (targetElement.classList.contains('collapse')) {
-                        button.textContent = 'Hide Attributes';  // Change button text to "Hide"
-                    } else {
-                        button.textContent = 'Show Attributes';  // Change button text to "Show"
-                    }
+                    button.textContent = targetElement.classList.contains('show') ? 'Show Attributes' : 'Hide Attributes';
                 });
             });
         });
+
+        document.getElementById('searchAdd').addEventListener('keyup', function () {
+            filterTable('searchAdd', 'userTable');
+        });
+
+        function filterTable(inputId, tableId) {
+            let input = document.getElementById(inputId).value.toLowerCase();
+            let table = document.getElementById(tableId);
+            let rows = table.getElementsByTagName('tr');
+            
+            for (let i = 1; i < rows.length; i++) {
+                let cells = rows[i].getElementsByTagName('td');
+                let match = false;
+                
+                for (let j = 1; j < cells.length; j++) {
+                    if (cells[j].textContent.toLowerCase().includes(input)) {
+                        match = true;
+                        break;
+                    }
+                }
+                rows[i].style.display = match ? '' : 'none';
+            }
+        }
     </script>
 {% endblock %}

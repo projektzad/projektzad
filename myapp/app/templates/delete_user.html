@@ -4,7 +4,8 @@
     <h2>Delete Users</h2>
     <!-- Form for selecting users -->
     <form method="post">
-        <table class="table">
+        <input type="text" id="search" class="form-control" placeholder="Search users...">
+        <table class="table" id="userTable">
             <thead>
                 <tr>
                     <th>Select</th>
@@ -61,20 +62,37 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const toggleButtons = document.querySelectorAll('.toggle-attributes');
-
             toggleButtons.forEach(button => {
                 button.addEventListener('click', function () {
                     const targetId = button.getAttribute('data-target');
                     const targetElement = document.querySelector(targetId);
-
-                    // Check if the target element is currently collapsed or visible
-                    if (targetElement.classList.contains('collapse')) {
-                        button.textContent = 'Hide Attributes';  // Change button text to "Hide"
-                    } else {
-                        button.textContent = 'Show Attributes';  // Change button text to "Show"
-                    }
+                    targetElement.classList.toggle('show');
+                    button.textContent = targetElement.classList.contains('show') ? 'Hide Attributes' : 'Show Attributes';
                 });
             });
         });
+
+        document.getElementById('search').addEventListener('keyup', function () {
+            filterTable('search', 'userTable');
+        });
+
+        function filterTable(inputId, tableId) {
+            let input = document.getElementById(inputId).value.toLowerCase();
+            let table = document.getElementById(tableId);
+            let rows = table.getElementsByTagName('tr');
+            
+            for (let i = 1; i < rows.length; i++) {
+                let cells = rows[i].getElementsByTagName('td');
+                let match = false;
+                
+                for (let j = 1; j < cells.length; j++) {
+                    if (cells[j].textContent.toLowerCase().includes(input)) {
+                        match = true;
+                        break;
+                    }
+                }
+                rows[i].style.display = match ? '' : 'none';
+            }
+        }
     </script>
 {% endblock %}

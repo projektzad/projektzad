@@ -14,23 +14,61 @@
         <button type="submit" class="btn btn-success">Add Group</button>
     </form>
 
-    <!-- List of groups with delete option -->
     <h2>Existing Groups</h2>
-    {% if groups %}
-        <ul class="list-group">
-            {% for group in groups %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ group }}
-                    <form method="POST" action="{{ url_for('main.groups_management') }}" class="d-inline">
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="group_name" value="{{ group }}">
-                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                    </form>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="text-muted">No groups found. Add a group above.</p>
-    {% endif %}
+    <input type="text" id="searchAdd" class="form-control" placeholder="Search users...">
+    <table class="table" id="Table">
+        {% if groups %}
+            <thead>
+                <tr>
+                    <th>Group Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in groups %}
+                    <tr>
+                        <td>{{ group }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('main.groups_management') }}" class="d-inline">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="group_name" value="{{ group }}">
+                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        {% else %}
+            <tr>
+                <td colspan="2" class="text-muted text-center">No groups found. Add a group above.</td>
+            </tr>
+        {% endif %}
+    </table>
+    
 </div>
+
+<script>
+    document.getElementById('searchAdd').addEventListener('keyup', function () {
+        filterTable('searchAdd', 'Table');
+    });
+
+    function filterTable(inputId, tableId) {
+        let input = document.getElementById(inputId).value.toLowerCase();
+        let table = document.getElementById(tableId);
+        let rows = table.getElementsByTagName('tr');
+        
+        for (let i = 1; i < rows.length; i++) {
+            let cells = rows[i].getElementsByTagName('td');
+            let match = false;
+
+            // Only search through the first td (Group Name column)
+            if (cells.length > 0 && cells[0].textContent.toLowerCase().includes(input)) {
+                match = true;
+            }
+
+            rows[i].style.display = match ? '' : 'none';
+        }
+    }
+</script>
+
 {% endblock %}
