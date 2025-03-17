@@ -111,26 +111,41 @@ def get_ldap_connection():
 def validate_form(fields):
     return all(fields)
 
+
 @main_routes.route('/')
 def index():
-    if 'login' in session:
-        domain = session.get('domain', 'default.local')
-        search_base = domain_to_search_base(domain)
-        connection = get_ldap_connection()
-        if not connection:
-            flash("Brak aktywnego połączenia z LDAP. Zaloguj się ponownie.", "danger")
-            return redirect(url_for('main.login'))
-        try:
-            stats = {
-                'total_users': get_all_users_count(connection, search_base),
-                'blocked_users': get_blocked_users_count(connection, search_base),
-                'expiring_users': get_expiring_users_count(connection, search_base)
-            }
-            return render_template('index.html', login=session["login"], stats=stats)
-        except Exception as e:
-            flash(f"Wystąpił błąd: {str(e)}", "danger")
-            return redirect(url_for('main.index'))
-    return redirect(url_for('main.login'))
+    # Check if the user is logged in
+    if 'login' not in session:
+        return redirect(url_for('main.login'))
+
+    # Get domain and search base for LDAP queries
+    domain = session.get('domain', 'default.local')
+    search_base = domain_to_search_base(domain)
+    connection = get_ldap_connection()
+
+    # If there is no active LDAP connection, redirect to login
+    if not connection:
+        flash("No active LDAP connection. Please log in again.", "danger")
+        return redirect(url_for('main.login'))
+
+    try:
+        # Fetch user statistics
+        stats = {
+            'total_users': get_all_users_count(connection, search_base),
+            'blocked_users': get_blocked_users_count(connection, search_base),
+            'expiring_users': get_expiring_users_count(connection, search_base)
+        }
+
+        # Retrieve the list of all users
+        users = get_all_users(connection, search_base)
+
+        # Render the index page with user data
+        return render_template('index.html', login=session["login"], stats=stats, users=users)
+
+    except Exception as e:
+        # Handle errors and redirect to the index page with an error message
+        flash(f"An error occurred: {str(e)}", "danger")
+        return redirect(url_for('main.index'))
 
 
 from flask import request, session, redirect, url_for, flash, render_template
@@ -138,11 +153,40 @@ from flask import request, session, redirect, url_for, flash, render_template
 @main_routes.route('/checkbox_form', methods=['GET', 'POST'])
 def checkbox_form():
     options = [
-        'whenChanged', 'whenCreated', 'uSNChanged', 'uSNCreated', 'userPrincipalName',
-        'userAccountControl', 'sAMAccountType', 'pwdLastSet', 'primaryGroupID', 'objectCategory',
-        'objectClass', 'objectGUID', 'objectSid', 'cn', 'logonCount', 'instanceType', 'givenName',
-        'dSCorePropagationData', 'displayName', 'countryCode', 'codePage', 'sn', 'badPwdCount',
-        'badPasswordTime', 'accountExpires'
+        'objectClass',
+        'cn',
+        'sAMAccountName',
+        'userPrincipalName',
+        'givenName',
+        'sn',
+        'displayName',
+        'uid',
+        'uidNumber',
+        'gidNumber',
+        'unixHomeDirectory',
+        'loginShell',
+        'homeDirectory',
+        'homeDrive',
+        'mail',
+        'whenChanged',
+        'whenCreated',
+        'uSNChanged',
+        'uSNCreated',
+        'userAccountControl',
+        'sAMAccountType',
+        'pwdLastSet',
+        'primaryGroupID',
+        'objectCategory',
+        'objectGUID',
+        'objectSid',
+        'logonCount',
+        'instanceType',
+        'dSCorePropagationData',
+        'countryCode',
+        'codePage',
+        'badPwdCount',
+        'badPasswordTime',
+        'accountExpires'
     ]
 
     if request.method == 'POST':
@@ -345,7 +389,7 @@ def add_user_post():
     try:
         # Tworzenie użytkownika
         search_base = domain_to_search_base(session.get('domain'))
-        success = create_user(connection, username, first_name, last_name, password, ou, search_base)
+        success = create_user(connection, username, first_name, last_name, password, ou, search_base,search_base)
         if success:
             flash(f"Użytkownik {username} został pomyślnie dodany.", "success")
         else:
