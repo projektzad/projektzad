@@ -24,13 +24,19 @@
 
     <!-- Users to Add Section -->
     <h4>Users to Add</h4>
-    <input type="text" id="searchAdd" class="form-control" placeholder="Search users...">
-    <table class="table" id="tableAdd">
+    <th>
+        <input type="checkbox" id="selectAll">
+        <label for="selectAll">Select/Deselect All</label>
+    </th>
+    <input type="text" id="searchUser" class="form-control" placeholder="Search users...">
+    <table class="table" id="userTable">
         <thead>
             <tr>
                 <th>Select</th>
-                <th>Username</th>
-                <th>Distinguished Name</th>
+                <!-- Dynamiczne generowanie nagłówków kolumn na podstawie cols -->
+                {% for col in cols %}
+                    <th>{{ col }} ⬍</th>
+                {% endfor %}
                 <th>Attributes</th>
             </tr>
         </thead>
@@ -38,19 +44,24 @@
             {% for user in users %}
                 {% if user.distinguishedName not in members %}
                 <tr>
-                    <td><input type="checkbox" name="add_users" value="{{ user.distinguishedName }}"></td>
-                    <td>{{ user.name if user.name else 'N/A' }}</td>
-                    <td>{{ user.distinguishedName if user.distinguishedName else 'N/A' }}</td>
+                    <td>
+                        <!-- Checkbox do zaznaczania użytkowników -->
+                        <input type="checkbox" name="selected_users" value="{{ user.name }}|{{ user.distinguishedName }}"
+                               {% if user.name in options or user.distinguishedName in options %}checked{% endif %}>
+                    </td>
+                    <!-- Dynamiczne generowanie komórek tabeli na podstawie cols -->
+                    {% for col in cols %}
+                        <td>{{ user[col] if user[col] else 'N/A' }}</td>
+                    {% endfor %}
                     <td>
                         <button type="button" class="btn btn-info btn-sm toggle-attributes" 
-                                data-toggle="collapse" 
-                                data-target="#attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}">
+                                data-target="#attributes-{{ loop.index }}">
                             Show Attributes
                         </button>
-                        <div id="attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}" class="collapse">
+                        <div id="attributes-{{ loop.index }}" class="collapse">
                             <ul>
                                 {% for key, value in user.items() %}
-                                    {% if key != 'name' and key != 'distinguishedName' %}
+                                    {% if key not in cols %}
                                         <li><strong>{{ key }}:</strong> {{ value }}</li>
                                     {% endif %}
                                 {% endfor %}
@@ -63,74 +74,59 @@
         </tbody>
     </table>
 
-        <!-- Users to Remove Section -->
-        <h4>Users to Remove</h4>
-        <input type="text" id="searchRemove" class="form-control" placeholder="Search users...">
-        <table class="table" id="tableRemove">
-            <thead>
-                <tr>
-                    <th>Select</th>
-                    <th>Username</th>
-                    <th>Distinguished Name</th>
-                    <th>Attributes</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                    {% if user.distinguishedName in members %}
-                    <tr>
-                        <td><input type="checkbox" name="remove_users" value="{{ user.distinguishedName }}"></td>
-                        <td>{{ user.name if user.name else 'N/A' }}</td>
-                        <td>{{ user.distinguishedName if user.distinguishedName else 'N/A' }}</td>
-                        <td>
-                            <div class="attributes-container">
-                                <button type="button" class="btn btn-info btn-sm toggle-attributes" 
-                                        data-toggle="collapse" 
-                                        data-target="#attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}">
-                                    Show Attributes
-                                </button>
-                                <div id="attributes-{{ user.cn | replace(' ', '-') }}-{{ loop.index }}" class="collapse">
-                                    <ul>
-                                        {% for key, value in user.items() %}
-                                            {% if key != 'name' and key != 'distinguishedName' %}
-                                                <li><strong>{{ key }}:</strong> {{ value }}</li>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
+    Users to Remove Section
+    <h4>Users to Remove</h4>
+    <th>
+        <input type="checkbox" id="selectAll2">
+        <label for="selectAll">Select/Deselect All</label>
+    </th>
+    <input type="text" id="searchRemove" class="form-control" placeholder="Search users...">
+    <table class="table" id="userTable2">
+        <thead>
+            <tr>
+                
+                {% for col in cols %}
+                    <th>{{ col }} ⬍</th>
                 {% endfor %}
-            </tbody>
-        </table>
+                <th>Attributes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+                {% if user.distinguishedName in members %}
+                <tr>
+                    <td>
+                        
+                        <input type="checkbox" name="selected_users" value="{{ user.name }}|{{ user.distinguishedName }}"
+                               {% if user.name in options or user.distinguishedName in options %}checked{% endif %}>
+                    </td>
+                   
+                    {% for col in cols %}
+                        <td>{{ user[col] if user[col] else 'N/A' }}</td>
+                    {% endfor %}
+                    <td>
+                        <button type="button" class="btn btn-info btn-sm toggle-attributes" 
+                                data-target="#attributes-{{ loop.index }}">
+                            Show Attributes
+                        </button>
+                        <div id="attributes-{{ loop.index }}" class="collapse">
+                            <ul>
+                                {% for key, value in user.items() %}
+                                    {% if key not in cols %}
+                                        <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
 
     <button type="submit" class="btn btn-info">Modify Group</button>
 </form>
 {% endif %}
-
-
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        document.getElementById('searchAdd').addEventListener('keyup', function () {
-            filterTable('searchAdd', 'tableAdd');
-        });
-        document.getElementById('searchRemove').addEventListener('keyup', function () {
-            filterTable('searchRemove', 'tableRemove');
-        });
-    });
-
-    function filterTable(inputId, tableId) {
-        let input = document.getElementById(inputId).value.toLowerCase();
-        let table = document.getElementById(tableId);
-        let rows = table.getElementsByTagName('tr');
-        
-        for (let i = 1; i < rows.length; i++) { // Skip header row
-            let text = rows[i].textContent.toLowerCase();
-            rows[i].style.display = text.includes(input) ? '' : 'none';
-        }
-    }
-</script>
+<script src="{{ url_for('static', filename='js/html.js') }}"></script>
 {% endblock %}

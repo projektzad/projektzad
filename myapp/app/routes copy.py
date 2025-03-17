@@ -186,7 +186,7 @@ def login():
         password = request.form['password']
         domain = request.form['domain']
         [is_connected, connection] = co.connect_to_active_directory(ldap_server, login, password, domain)
-        #print("Czy połaczaony:" , is_connected)
+        
         if is_connected:
             session['ldap_server'] = ldap_server
             session['login'] = login
@@ -211,98 +211,199 @@ def logout():
     return redirect(url_for('main.login'))
 
 
+# @main_routes.route('/delete_user', methods=['GET', 'POST'])
+# def delete_user():
+#     if 'login' not in session:
+#         return redirect(url_for('main.login'))
+#     connection = get_ldap_connection()  # Use the global LDAP connection
+    
+#     if request.method == 'POST':
+#         if not connection:
+#             flash_error("Brak połączenia z Active Directory.")
+#             return redirect(url_for('main.login'))
+
+#         if 'selected_users' in request.form:  # For selected users (checkbox method)
+#             selected_users = request.form.getlist('selected_users')
+#             if not selected_users:
+#                 flash_error("Nie wybrano żadnych użytkowników do usunięcia.")
+#                 return redirect(url_for('main.delete_user'))  # Redirect back to the same page
+
+#             errors = []
+#             successes = []
+#             for user_data in selected_users:
+#                 #print("USER DATA FROM DELETE:",user_data)
+#                 try:
+#                     username, domain = user_data.split('|')
+#                     ou, domain, cn = parse_user_data(domain)
+#                     if ou:
+#                         success = delete_user_from_active_directory(connection, username, domain, ou)
+#                     else:
+#                         success = delete_user_from_active_directory(connection, username, domain)
+
+#                     if success:
+#                         successes.append(username)
+#                     else:
+#                         errors.append(username)
+#                 except ValueError:
+#                     errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
+
+#             # Handle success and errors
+#             if successes:
+#                 flash(f"Użytkownicy {', '.join(successes)} zostali pomyślnie usunięci.", 'success')
+#             if errors:
+#                 flash_error(f"Wystąpiły błędy podczas usuwania użytkowników: {', '.join(errors)}.")
+
+#         elif 'file' in request.files:  # Handle file upload
+#             file = request.files['file']
+#             if file.filename == '':
+#                 flash_error("Nie wybrano pliku do przesłania.")
+#                 return redirect(url_for('main.delete_user'))
+
+#             file_path = os.path.join("uploads", file.filename)
+#             file.save(file_path)
+
+#             # Process file based on type (Excel or CSV)
+#             try:
+#                 if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
+#                     deleted_count = delete_multiple_users(connection, file_path)
+#                 else:
+#                     flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
+#                     return redirect(url_for('main.delete_user'))
+
+#                 flash(f"Usunięto {deleted_count} użytkowników z pliku.", 'success')
+#             except Exception as e:
+#                 flash_error(f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}")
+
+#             return redirect(url_for('main.delete_user'))
+
+#         return redirect(url_for('main.delete_user'))  # Always return a redirect after POST
+
+#     elif request.method == 'GET':
+#         if not connection:
+#             flash_error("Brak połączenia z Active Directory.")
+#             return redirect(url_for('main.login'))
+
+#         try:
+#             # Fetch user list for the form
+#             domain = session.get('domain', 'default.local')
+#             print("Domain:", domain)
+#             search_base = domain_to_search_base(domain)
+#             print("Search Base:", search_base)
+#             #search_base = "dc=testad,dc=local"
+#             selected = session.get('options')
+#             if selected:
+#                 users = get_all_users(connection, search_base,selected)
+#                 print(users)
+#             else:
+#                 users = get_all_users(connection, search_base)
+#             print(users)
+#             print(session.get('options'))
+#             return render_template('delete_user.html', users=users, options=session.get('options'))
+#         except Exception as e:
+            
+#             flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
+#             return redirect(url_for('main.index'))
+
 @main_routes.route('/delete_user', methods=['GET', 'POST'])
 def delete_user():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
     connection = get_ldap_connection()  # Use the global LDAP connection
+    
     if request.method == 'POST':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
+        if 'selected_users' in request.form:
+            return delete_user_post(connection)
+        elif 'file' in request.files:
+            return delete_user_file(connection)
+    
+    return delete_user_get(connection)
 
-        if 'selected_users' in request.form:  # For selected users (checkbox method)
-            selected_users = request.form.getlist('selected_users')
-            if not selected_users:
-                flash_error("Nie wybrano żadnych użytkowników do usunięcia.")
-                return redirect(url_for('main.delete_user'))  # Redirect back to the same page
+def delete_user_get(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
+    try:
+        # Fetch user list for the form
+        domain = session.get('domain', 'default.local')
+        #print("Domain:", domain)
+        search_base = domain_to_search_base(domain)
+        #print("Search Base:", search_base)
+        
+        selected = session.get('options')
+        if selected:
+            users = get_all_users(connection, search_base, selected)
+        else:
+            users = get_all_users(connection, search_base)
+        
+        print(users)
+        return render_template('delete_user.html', users=users, options=selected)
+    except Exception as e:
+        flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
+        return redirect(url_for('main.index'))
 
-            errors = []
-            successes = []
-            for user_data in selected_users:
-                print("USER DATA FROM DELETE:",user_data)
-                try:
-                    username, domain = user_data.split('|')
-                    ou, domain, cn = parse_user_data(domain)
-                    if ou:
-                        success = delete_user_from_active_directory(connection, username, domain, ou)
-                    else:
-                        success = delete_user_from_active_directory(connection, username, domain)
+def delete_user_post(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
 
-                    if success:
-                        successes.append(username)
-                    else:
-                        errors.append(username)
-                except ValueError:
-                    errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
+    selected_users = request.form.getlist('selected_users')
+    if not selected_users:
+        flash_error("Nie wybrano żadnych użytkowników do usunięcia.")
+        return redirect(url_for('main.delete_user'))
 
-            # Handle success and errors
-            if successes:
-                flash(f"Użytkownicy {', '.join(successes)} zostali pomyślnie usunięci.", 'success')
-            if errors:
-                flash_error(f"Wystąpiły błędy podczas usuwania użytkowników: {', '.join(errors)}.")
+    errors = []
+    successes = []
 
-        elif 'file' in request.files:  # Handle file upload
-            file = request.files['file']
-            if file.filename == '':
-                flash_error("Nie wybrano pliku do przesłania.")
-                return redirect(url_for('main.delete_user'))
+    for user_data in selected_users:
+        try:
+            username, domain = user_data.split('|')
+            ou, domain, _ = parse_user_data(domain)
+            if ou:
+                success = delete_user_from_active_directory(connection, username, domain, ou)
+            else:
+                success = delete_user_from_active_directory(connection, username, domain)
 
-            file_path = os.path.join("uploads", file.filename)
-            file.save(file_path)
+            if success:
+                successes.append(username)
+            else:
+                errors.append(username)
+        except ValueError:
+            errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
 
-            # Process file based on type (Excel or CSV)
-            try:
-                if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
-                    deleted_count = delete_multiple_users(connection, file_path)
-                else:
-                    flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
-                    return redirect(url_for('main.delete_user'))
+    # Handle success and errors
+    if successes:
+        flash(f"Użytkownicy {', '.join(successes)} zostali pomyślnie usunięci.", 'success')
+    if errors:
+        flash_error(f"Wystąpiły błędy podczas usuwania użytkowników: {', '.join(errors)}.")
 
-                flash(f"Usunięto {deleted_count} użytkowników z pliku.", 'success')
-            except Exception as e:
-                flash_error(f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}")
+    return redirect(url_for('main.delete_user'))
 
+def delete_user_file(connection):
+    if not connection:
+        flash_error("Brak połączenia z Active Directory.")
+        return redirect(url_for('main.login'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash_error("Nie wybrano pliku do przesłania.")
+        return redirect(url_for('main.delete_user'))
+
+    file_path = os.path.join("uploads", file.filename)
+    file.save(file_path)
+
+    try:
+        if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
+            deleted_count = delete_multiple_users(connection, file_path)
+        else:
+            flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
             return redirect(url_for('main.delete_user'))
 
-        return redirect(url_for('main.delete_user'))  # Always return a redirect after POST
+        flash(f"Usunięto {deleted_count} użytkowników z pliku.", 'success')
+    except Exception as e:
+        flash_error(f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}")
 
-    elif request.method == 'GET':
-        if not connection:
-            flash_error("Brak połączenia z Active Directory.")
-            return redirect(url_for('main.login'))
-
-        try:
-            # Fetch user list for the form
-            domain = session.get('domain', 'default.local')
-            print("Domain:", domain)
-            search_base = domain_to_search_base(domain)
-            print("Search Base:", search_base)
-            #search_base = "dc=testad,dc=local"
-            selected = session.get('options')
-            if selected:
-                users = get_all_users(connection, search_base,selected)
-                print(users)
-            else:
-                users = get_all_users(connection, search_base)
-            print(users)
-            print(session.get('options'))
-            return render_template('delete_user.html', users=users, options=session.get('options'))
-        except Exception as e:
-            
-            flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
-            return redirect(url_for('main.index'))
+    return redirect(url_for('main.delete_user'))
 
 
 @main_routes.route('/add_user', methods=['GET', 'POST'])

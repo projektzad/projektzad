@@ -1,46 +1,66 @@
-<!-- templates/checkbox_form.html -->
 {% extends "base.html" %}
 
 {% block content %}
     <h1>Select Options</h1>
     
     <form method="POST" action="{{ url_for('main.checkbox_form') }}">
-        <div class="form-group">
-            <label for="checkboxes">Choose your options:</label>
-            <div id="checkboxes">
-                {% for option in options %}
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="{{ option }}" name="selected_options" value="{{ option }}"
-                            {% if option in preselected_options %} checked {% endif %}>
-                        <label class="form-check-label" for="{{ option }}">{{ option }}</label>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
+        <input type="hidden" name="previous_url" value="{{ request.referrer }}">
 
-        <!-- Buttons to select or deselect all checkboxes -->
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Option</th>
+                    <th>
+                        <input type="checkbox" id="selectAllColumns" onclick="toggleAll('column')">
+                        Use as Column
+                    </th>
+                    <th>
+                        <input type="checkbox" id="selectAllFilters" onclick="toggleAll('filter')">
+                        Filter Non-Empty
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for option in options %}
+                <tr>
+                    <td>{{ option }}</td>
+                    <td>
+                        <input type="checkbox" class="form-check-input column-checkbox" id="col_{{ option }}" 
+                               name="column_options" value="{{ option }}"
+                               {% if option in preselected_columns %} checked {% endif %}>
+                    </td>
+                    <td>
+                        <input type="checkbox" class="form-check-input filter-checkbox" id="filter_{{ option }}" 
+                               name="filter_options" value="{{ option }}"
+                               {% if option in preselected_filters %} checked {% endif %}>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Buttons to select or deselect all -->
         <div class="form-group">
-            <button type="button" class="btn btn-secondary" onclick="selectAll()">Select All</button>
-            <button type="button" class="btn btn-secondary" onclick="deselectAll()">Deselect All</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleAll('column', true)">Select All Columns</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleAll('column', false)">Deselect All Columns</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleAll('filter', true)">Select All Filters</button>
+            <button type="button" class="btn btn-secondary" onclick="toggleAll('filter', false)">Deselect All Filters</button>
         </div>
 
         <button type="submit" class="btn btn-primary">Submit</button>
     </form>
 
     <script>
-        // Function to select all checkboxes
-        function selectAll() {
-            var checkboxes = document.querySelectorAll('input[name="selected_options"]');
-            checkboxes.forEach(function(checkbox) {
-                checkbox.checked = true;
-            });
-        }
-
-        // Function to deselect all checkboxes
-        function deselectAll() {
-            var checkboxes = document.querySelectorAll('input[name="selected_options"]');
-            checkboxes.forEach(function(checkbox) {
-                checkbox.checked = false;
+        function toggleAll(type, state = null) {
+            let checkboxes;
+            if (type === 'column') {
+                checkboxes = document.querySelectorAll('.column-checkbox');
+            } else if (type === 'filter') {
+                checkboxes = document.querySelectorAll('.filter-checkbox');
+            }
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = state !== null ? state : !checkbox.checked;
             });
         }
     </script>

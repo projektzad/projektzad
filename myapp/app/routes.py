@@ -133,48 +133,47 @@ def index():
     return redirect(url_for('main.login'))
 
 
+from flask import request, session, redirect, url_for, flash, render_template
+
 @main_routes.route('/checkbox_form', methods=['GET', 'POST'])
 def checkbox_form():
     options = [
-    'whenChanged',
-    'whenCreated',
-    'uSNChanged',
-    'uSNCreated',
-    'userPrincipalName',
-    'userAccountControl',
-    'sAMAccountType',
-    'pwdLastSet',
-    'primaryGroupID',
-    'objectCategory',
-    'objectClass',
-    'objectGUID',
-    'objectSid',
-    'cn',
-    'logonCount',
-    'instanceType',
-    'givenName',
-    'dSCorePropagationData',
-    'displayName',
-    'countryCode',
-    'codePage',
-    'sn',
-    'badPwdCount',
-    'badPasswordTime',
-    'accountExpires'
-] 
-  # All options
+        'whenChanged', 'whenCreated', 'uSNChanged', 'uSNCreated', 'userPrincipalName',
+        'userAccountControl', 'sAMAccountType', 'pwdLastSet', 'primaryGroupID', 'objectCategory',
+        'objectClass', 'objectGUID', 'objectSid', 'cn', 'logonCount', 'instanceType', 'givenName',
+        'dSCorePropagationData', 'displayName', 'countryCode', 'codePage', 'sn', 'badPwdCount',
+        'badPasswordTime', 'accountExpires'
+    ]
+
     if request.method == 'POST':
-        selected = request.form.getlist('selected_options')
-        selected.append("name")
-        selected.append("distinguishedName")
-        flash(f'You selected: {", ".join(selected)}', 'success')
-        # Save selected options in session
-        session['options'] = selected
-        return redirect(url_for('main.checkbox_form'))
-    else:
-        # Retrieve selected options from session if available
-        preselected_options = session.get('options',  ['name', 'distinguishedName'])
-    return render_template('checkbox.html', options=options, preselected_options=preselected_options)
+        selected_filters = request.form.getlist('filter_options')
+        selected_columns = request.form.getlist('column_options')
+
+        # Domyślne wartości, które zawsze powinny być wybrane
+        selected_columns.extend(["name", "distinguishedName"])
+
+        # Zapisz wybory użytkownika w sesji
+        session['options'] = selected_filters
+        session['columns'] = selected_columns
+
+        flash(f'Selected columns: {", ".join(selected_columns)}', 'success')
+        flash(f'Selected filters: {", ".join(selected_filters)}', 'info')
+
+        # Pobierz poprzedni adres URL lub domyślnie przekieruj na stronę główną
+        previous_url = request.form.get('previous_url', url_for('main.index'))
+        return redirect(previous_url)
+
+    # Pobieramy wcześniejsze wybory z sesji (jeśli istnieją)
+    preselected_columns = session.get('columns', ["name", "distinguishedName"])
+    preselected_filters = session.get('options', [])
+
+    return render_template(
+        'checkbox.html',
+        options=options,
+        preselected_columns=preselected_columns,
+        preselected_filters=preselected_filters
+    )
+
 
 @main_routes.route('/login', methods=['GET', 'POST'])
 def login():
@@ -236,13 +235,14 @@ def delete_user_get(connection):
         #print("Search Base:", search_base)
         
         selected = session.get('options')
-        if selected:
-            users = get_all_users(connection, search_base, selected)
-        else:
-            users = get_all_users(connection, search_base)
+        columns = session.get('columns')
+        all = selected + columns
+
+     
+        users = get_all_users(connection, search_base, all)
+      
         
-        print(users)
-        return render_template('delete_user.html', users=users, options=selected)
+        return render_template('delete_user.html', users=users, cols = columns , options=selected)
     except Exception as e:
         flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
         return redirect(url_for('main.index'))
@@ -380,13 +380,12 @@ def toggle_block_user_get(connection):
         domain = session.get('domain', 'default.local')
         search_base = domain_to_search_base(domain)
         selected = session.get('options')
+        columns = session.get('columns')
+        all = selected + columns
+
+        users = get_all_users(connection, search_base, all)
         
-        if selected:
-            users = get_all_users(connection, search_base, selected)
-        else:
-            users = get_all_users(connection, search_base)
-        
-        return render_template('block_user.html', users=users, options=selected)
+        return render_template('block_user.html', users=users, cols = columns ,options=selected)
     except Exception as e:
         flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
         return redirect(url_for('main.index'))
@@ -559,14 +558,16 @@ def handle_get_request(connection):
         # Fetch user list for the form
         domain = session.get('domain', 'testad.local')
         search_base = domain_to_search_base(domain)
+        
         selected = session.get('options')
+        columns = session.get('columns')
+        all = selected + columns
 
-        if selected:
-            users = get_all_users(connection, search_base, selected)
-        else:
-            users = get_all_users(connection, search_base)
+     
+        users = get_all_users(connection, search_base, all)
+        
 
-        return render_template('expire_user.html', users=users, options=session.get('options'))
+        return render_template('expire_user.html', users=users, cols = columns , options=selected)
     except Exception as e:
         flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
         return redirect(url_for('main.index'))
@@ -675,14 +676,19 @@ def handle_get_group_modification(connection):
         groups, _ = list_all_groups(connection, domain)
         selected_group = request.args.get('group_name')
         members = list_group_members(connection, domain, selected_group) if selected_group else []
-        users = get_all_users(connection, domain_to_search_base(domain), session.get('options'))
-  
-        
+
+        selected = session.get('options')
+        columns = session.get('columns')
+        all = selected + columns
+
+        users = get_all_users(connection, domain_to_search_base(domain), all)
+
         return render_template(
             'modify_group_members.html',
             groups=groups,
             members=members,
             selected_group=selected_group,
+            cols= columns,
             users=users,
             options = session.get('options')
         )
