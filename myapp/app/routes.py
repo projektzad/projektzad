@@ -136,12 +136,11 @@ def index():
         }
 
         # Retrieve the list of all users
-        selected = session.get('options')
-        columns = session.get('columns')
-        all = selected + columns
+        selected = session.get('options',[])
+        columns = session.get('columns',[])
+        all_columns = selected + columns
 
-     
-        users = get_all_users(connection, search_base, all)
+        users = get_all_users(connection, search_base, all_columns)
 
         # Render the index page with user data
         return render_template('index.html', login=session["login"], stats=stats, users=users, cols = columns , options=selected )
@@ -238,6 +237,8 @@ def login():
             session['login'] = login
             session['domain'] = domain
             session['columns'] = ["name", "distinguishedName"]
+            session['options'] = []
+            
             connection_global = connection  # Assign to the global variable
             return redirect(url_for('main.index'))
         else:
@@ -287,7 +288,6 @@ def delete_user_get(connection):
         columns = session.get('columns')
         all = selected + columns
 
-     
         users = get_all_users(connection, search_base, all)
       
         
