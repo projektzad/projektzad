@@ -118,7 +118,6 @@ def index():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    # Get domain and search base for LDAP queries
     domain = session.get('domain', 'default.local')
     search_base = domain_to_search_base(domain)
     connection = get_ldap_connection()
@@ -137,10 +136,15 @@ def index():
         }
 
         # Retrieve the list of all users
-        users = get_all_users(connection, search_base)
+        selected = session.get('options')
+        columns = session.get('columns')
+        all = selected + columns
+
+     
+        users = get_all_users(connection, search_base, all)
 
         # Render the index page with user data
-        return render_template('index.html', login=session["login"], stats=stats, users=users)
+        return render_template('index.html', login=session["login"], stats=stats, users=users, cols = columns , options=selected )
 
     except Exception as e:
         # Handle errors and redirect to the index page with an error message
@@ -233,6 +237,7 @@ def login():
             session['ldap_server'] = ldap_server
             session['login'] = login
             session['domain'] = domain
+            session['columns'] = ["name", "distinguishedName"]
             connection_global = connection  # Assign to the global variable
             return redirect(url_for('main.index'))
         else:
@@ -639,6 +644,8 @@ def handle_post_group_modification(connection):
     group_name = request.form.get('group_name')
     add_users = request.form.getlist('add_users')
     remove_users = request.form.getlist('remove_users')
+
+    print(add_users)
 
     domain = session.get('domain', 'company.com')
     groups, oulist = list_all_groups(connection, domain)

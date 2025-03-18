@@ -24,10 +24,9 @@
 
     <!-- Users to Add Section -->
     <h4>Users to Add</h4>
-    <th>
-        <input type="checkbox" id="selectAll">
-        <label for="selectAll">Select/Deselect All</label>
-    </th>
+    <input type="checkbox" id="selectAll">
+    <label for="selectAll">Select/Deselect All</label>
+
     <input type="text" id="searchUser" class="form-control" placeholder="Search users...">
     <table class="table" id="userTable">
         <thead>
@@ -46,7 +45,7 @@
                 <tr>
                     <td>
                         <!-- Checkbox do zaznaczania użytkowników -->
-                        <input type="checkbox" name="selected_users" value="{{ user.name }}|{{ user.distinguishedName }}"
+                        <input type="checkbox" name="add_users" value="{{ user.name }}|{{ user.distinguishedName }}"
                                {% if user.name in options or user.distinguishedName in options %}checked{% endif %}>
                     </td>
                     <!-- Dynamiczne generowanie komórek tabeli na podstawie cols -->
@@ -78,13 +77,13 @@
     <h4>Users to Remove</h4>
     <th>
         <input type="checkbox" id="selectAll2">
-        <label for="selectAll">Select/Deselect All</label>
+        <label for="selectAll2">Select/Deselect All</label>
     </th>
     <input type="text" id="searchRemove" class="form-control" placeholder="Search users...">
     <table class="table" id="userTable2">
         <thead>
             <tr>
-                
+                <th>Select</th>
                 {% for col in cols %}
                     <th>{{ col }} ⬍</th>
                 {% endfor %}
@@ -97,7 +96,7 @@
                 <tr>
                     <td>
                         
-                        <input type="checkbox" name="selected_users" value="{{ user.name }}|{{ user.distinguishedName }}"
+                        <input type="checkbox" name="remove_users" value="{{ user.name }}|{{ user.distinguishedName }}"
                                {% if user.name in options or user.distinguishedName in options %}checked{% endif %}>
                     </td>
                    
@@ -128,5 +127,8 @@
     <button type="submit" class="btn btn-info">Modify Group</button>
 </form>
 {% endif %}
-<script src="{{ url_for('static', filename='js/html.js') }}"></script>
+<script src="{{ url_for('static', filename='js/html2.js') }}"></script>
+
+
+
 {% endblock %}
