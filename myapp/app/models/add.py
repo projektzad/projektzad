@@ -1,6 +1,6 @@
 import re
 from ldap3 import MODIFY_REPLACE
-
+from app.config_utils import get_default_attributes, get_default_ou
 
 def get_next_uid_number(conn, search_base):
     """
@@ -49,30 +49,36 @@ def create_user(conn, username, firstname, lastname, password, ou, dc, search_ba
         print("Password must be at least 8 characters long.")
         return False
 
+    # Load configuration values
+    default_ou = get_default_ou()
+    default_attrs = get_default_attributes()
+
     # Generate a unique uidNumber
     uid_number = get_next_uid_number(conn, search_base)
     # Construct Distinguished Name (DN) dynamically using ou and dc
-    user_dn = f'CN={firstname} {lastname},{ou},{dc}'
-    print(user_dn)
-    # Define user attributes
+    user_dn = f'CN={firstname} {lastname},{default_ou},{dc}'
+    # Define base attributes
     attributes = {
         'objectClass': ['top', 'person', 'organizationalPerson', 'user'],
         'cn': f'{firstname} {lastname}',
         'sAMAccountName': username,
-        'userPrincipalName': f'{username}@{dc}',  # Adjusted for domain login
+        'userPrincipalName': f'{username}@{dc}',
         'givenName': firstname,
         'sn': lastname,
         'displayName': f'{firstname} {lastname}',
         'uid': username,
-        'uidNumber': str(uid_number),  # Assigning unique uidNumber
-        # 'userAccountControl': '512'  # Normal account
-        'gidNumber': '100',  # Default UNIX group
-        'unixHomeDirectory': f"/home/{username}",  # UNIX home directory
-        'loginShell': "/bin/bash",  # Default shell
-        'homeDirectory': f"\\\\server\\users$\\{username}",  # Windows home directory
-        'homeDrive': "I:",
-        'mail': f"{username}@zut.edu.pl"  # Email address
+        'uidNumber': str(uid_number)
     }
+
+    # Add default attributes
+    for key, value in default_attrs.items():
+        if key == "default_ou":
+            continue  # don't add to LDAP
+
+        if isinstance(value, str):
+            attributes[key] = value.replace("{username}", username)
+        else:
+            attributes[key] = value
 
     # Add user to LDAP
     if conn.add(user_dn, attributes=attributes):

@@ -1,4 +1,5 @@
 import re, os
+from ldap3.utils.conv import escape_filter_chars
 
 def validate_ldap_server(ldap_server: str) -> bool:
     """

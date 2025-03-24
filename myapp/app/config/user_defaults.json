@@ -1,0 +1,11 @@
+{
+  "default_ou": "CN=Users",
+  "attributes": {
+    "gidNumber": "100",
+    "unixHomeDirectory": "/home/{username}",
+    "loginShell": "/bin/bash",
+    "homeDirectory": "\\\\server\\users$\\{username}",
+    "homeDrive": "I:",
+    "mail": "{username}@zut.edu.pl"
+  }
+}

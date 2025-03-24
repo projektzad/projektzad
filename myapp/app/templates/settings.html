@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>⚙️ Default User Attribute Settings</h2>
+
+<form method="POST" class="mt-4">
+  <div class="mb-4">
+    <label for="default_ou" class="form-label"><strong>Organizational Unit (OU)</strong></label>
+    <input type="text" class="form-control" id="default_ou" name="default_ou" value="{{ default_ou }}">
+    <small class="form-text text-muted">Example: CN=Users</small>
+  </div>
+
+  <div id="attribute-fields">
+    {% for attr in available %}
+      {% if defaults.get(attr) %}
+        <div class="mb-3 attr-field" data-name="{{ attr }}">
+          <label for="{{ attr }}" class="form-label">{{ attr }}</label>
+          <input type="text" class="form-control" id="{{ attr }}" name="{{ attr }}" value="{{ defaults.get(attr, '') }}">
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <button type="button" class="btn btn-outline-secondary mb-3" onclick="toggleFieldList()">+ Add More Fields</button>
+
+  <div id="field-list" style="display:none;">
+    <p class="text-muted">Click to add a field:</p>
+    {% for attr in available %}
+      {% if not defaults.get(attr) %}
+        <button type="button" class="btn btn-sm btn-light mb-1 add-attr" data-name="{{ attr }}">{{ attr }}</button>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary mt-3">Save Settings</button>
+</form>
+
+<script>
+  function toggleFieldList() {
+    const list = document.getElementById("field-list");
+    list.style.display = list.style.display === "none" ? "block" : "none";
+  }
+
+  document.querySelectorAll('.add-attr').forEach(button => {
+    button.addEventListener('click', function () {
+      const name = this.dataset.name;
+
+      if (document.getElementById(name)) return;
+
+      const container = document.getElementById("attribute-fields");
+      const div = document.createElement("div");
+      div.className = "mb-3 attr-field";
+      div.dataset.name = name;
+      div.innerHTML = `
+        <label for="${name}" class="form-label">${name}</label>
+        <input type="text" class="form-control" id="${name}" name="${name}" value="">
+      `;
+      container.appendChild(div);
+      this.remove();
+    });
+  });
+</script>
+{% endblock %}

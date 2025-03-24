@@ -20,10 +20,17 @@
             <label for="password">Password</label>
             <input type="password" class="form-control" id="password" name="password" required>
         </div>
-        <div class="form-group">
-            <label for="ou">Organizational Unit</label>
-            <input type="text" class="form-control" id="ou" name="ou" required>
-        </div>
         <button type="submit" class="btn btn-primary">Add User</button>
     </form>
+    <hr>
+<h4>📥 Import Users from CSV or XLSX</h4>
+<form method="post" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="file">Select File:</label>
+        <input type="file" class="form-control" id="file" name="file" accept=".csv,.xlsx,.xls" required>
+    </div>
+    <button type="submit" class="btn btn-secondary mt-2">Import Users</button>
+</form>
+<p class="text-muted mt-2">Required columns: <code>username, first_name, last_name, password</code></p>
+
 {% endblock %}

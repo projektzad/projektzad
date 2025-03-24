@@ -19,7 +19,6 @@
 </head>
 <body>
     <div class="container mt-4">
-        <!-- Improved Navigation Bar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <a class="navbar-brand" href="{{ url_for('main.index') }}">LDAP Admin</a>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,14 +51,24 @@
                         <a class="nav-link" href="{{ url_for('main.checkbox_form') }}">Checkbox</a>
                     </li>
                     {% if 'login' in session %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.logout') }}">Logout</a>
-                    </li>
-                    {% else %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.login') }}">Login</a>
-                    </li>
-                    {% endif %}
+</ul> <!-- Zamykamy listę po lewej -->
+
+<ul class="navbar-nav ml-auto"> <!-- Nowa lista po prawej -->
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('main.settings') }}">⚙️</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('main.logout') }}">Logout</a>
+    </li>
+</ul>
+{% else %}
+</ul>
+<ul class="navbar-nav ml-auto">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('main.login') }}">Login</a>
+    </li>
+</ul>
+{% endif %}
                 </ul>
                 <!-- User Search Form -->
                 <form class="form-inline my-2 my-lg-0" action="{{ url_for('main.search_user') }}" method="post">

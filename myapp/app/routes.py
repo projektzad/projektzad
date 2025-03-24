@@ -5,6 +5,7 @@ import sys
 import os
 from datetime import datetime
 import re
+import uuid
 
 # Get the absolute path to the 'models' directory
 models_path = os.path.join(os.path.dirname(__file__), 'models')
@@ -14,11 +15,12 @@ sys.path.append(models_path)
 
 
 # Import the necessary modules and functions
+from app.models.batch_add import import_users_from_file
+from werkzeug.utils import secure_filename
 from app.models import connection as co
 from app.models.block import change_users_block_status,get_blocked_users_count
-
 from app.models.all_users import get_all_users,get_all_users_count
-
+from app.config_utils import save_user_defaults, get_default_attributes, load_config
 from app.models.block import block_multiple_users
 from app.models.expire import expire_multiple_users,set_account_expiration,get_expiring_users_count
 from app.models.add import create_user
@@ -231,14 +233,14 @@ def login():
         password = request.form['password']
         domain = request.form['domain']
         [is_connected, connection] = co.connect_to_active_directory(ldap_server, login, password, domain)
-        
+
         if is_connected:
             session['ldap_server'] = ldap_server
             session['login'] = login
             session['domain'] = domain
             session['columns'] = ["name", "distinguishedName"]
             session['options'] = []
-            
+
             connection_global = connection  # Assign to the global variable
             return redirect(url_for('main.index'))
         else:
@@ -365,6 +367,66 @@ def add_user():
         return redirect(url_for('main.login'))
 
     if request.method == 'POST':
+        if 'file' in request.files:
+            file = request.files['file']
+            if file.filename == '':
+                flash("No file selected.", "danger")
+                return redirect(url_for('main.add_user'))
+
+            ext = os.path.splitext(file.filename)[1].lower()
+            unique_name = f"import_{uuid.uuid4().hex}{ext}"
+            filepath = os.path.join('app/static', unique_name)
+            file.save(filepath)
+
+            preview_data = []
+            try:
+                if ext == ".csv":
+                    with open(filepath, newline='', encoding='utf-8') as csvfile:
+                        reader = csv.DictReader(csvfile)
+                        for row in reader:
+                            preview_data.append(row)
+                elif ext in [".xlsx", ".xls"]:
+                    wb = openpyxl.load_workbook(filepath)
+                    sheet = wb.active
+                    headers = [cell.value for cell in sheet[1]]
+                    for row in sheet.iter_rows(min_row=2, values_only=True):
+                        row_data = dict(zip(headers, row))
+                        preview_data.append(row_data)
+                else:
+                    flash("Unsupported file format.", "danger")
+                    return redirect(url_for('main.add_user'))
+
+                session['import_file'] = filepath
+                return render_template("preview_import.html", users=preview_data)
+
+            except Exception as e:
+                flash(f"Error processing file: {str(e)}", "danger")
+                return redirect(url_for('main.add_user'))
+
+        if 'confirm_import' in request.form:
+            filepath = session.get('import_file')
+            if not filepath or not os.path.exists(filepath):
+                flash("No file to import.", "danger")
+                return redirect(url_for('main.add_user'))
+
+            domain = session.get('domain')
+            dc = ','.join([f"DC={x}" for x in domain.split('.')])
+            search_base = dc
+            connection = get_ldap_connection()
+            result = import_users_from_file(connection, filepath, dc, search_base)
+            if 'error' in result:
+                flash(result['error'], 'danger')
+            else:
+                flash(f"✅ Added: {result['added']}, ❌ Failed: {result['failed']}", 'info')
+                if result['errors']:
+                    flash("Errors:\n" + "\n".join(result['errors']), 'warning')
+
+            os.remove(filepath)
+            session.pop('import_file', None)
+
+            return redirect(url_for('main.add_user'))
+
+        # Jeśli zwykły formularz z dodawaniem 1 użytkownika
         return add_user_post()
 
     return add_user_get()
@@ -373,34 +435,37 @@ def add_user_get():
     return render_template('add_user.html')
 
 def add_user_post():
-    # Pobierz dane z formularza
     username = request.form.get('username')
     first_name = request.form.get('first_name')
     last_name = request.form.get('last_name')
     password = request.form.get('password')
-    ou = request.form.get('ou')
 
     # Walidacja danych
-    if not validate_form([username, first_name, last_name, password, ou]):
-        flash_error("Wszystkie pola są wymagane.")
+    if not validate_form([username, first_name, last_name, password]):
+        flash_error("All fields are required.")
         return render_template('add_user.html')
 
     # Połączenie z LDAP
     connection = get_ldap_connection()
     if not connection:
-        flash_error("Brak połączenia z Active Directory.")
+        flash_error("No connection to Active Directory.")
         return redirect(url_for('main.login'))
 
     try:
-        # Tworzenie użytkownika
-        search_base = domain_to_search_base(session.get('domain'))
-        success = create_user(connection, username, first_name, last_name, password, ou, search_base,search_base)
+        # Get DC and search_base from domain
+        domain = session.get('domain')  # e.g. "testad.local"
+        dc = ','.join([f"DC={part}" for part in domain.split('.')])
+        search_base = dc
+
+        # Call create_user
+        success = create_user(connection, username, first_name, last_name, password, dc, search_base,search_base)
+
         if success:
-            flash(f"Użytkownik {username} został pomyślnie dodany.", "success")
+            flash(f"User {username} created successfully.", "success")
         else:
-            flash_error(f"Nie udało się dodać użytkownika {username}.")
+            flash_error(f"Failed to create user {username}.")
     except Exception as e:
-        flash_error(f"Wystąpił błąd: {str(e)}")
+        flash_error(f"An error occurred: {str(e)}")
         return redirect(url_for('main.index'))
 
     return redirect(url_for('main.index'))
@@ -843,3 +908,37 @@ def handle_get_group_management(connection, domain):
 @main_routes.app_errorhandler(404)
 def page_not_found(error):
     return render_template('page_not_found.html'), 404
+
+@main_routes.route('/settings', methods=['GET', 'POST'])
+def settings():
+    available_attrs = [
+        'gidNumber', 'unixHomeDirectory', 'loginShell',
+        'homeDirectory', 'homeDrive', 'mail',
+        'description', 'telephoneNumber', 'title', 'department',
+        'company', 'employeeID', 'profilePath', 'scriptPath'
+    ]
+
+    if request.method == 'POST':
+        user_defaults = {}
+        for attr in available_attrs:
+            value = request.form.get(attr)
+            if value:
+                user_defaults[attr] = value
+
+        default_ou = request.form.get('default_ou') or "CN=Users"
+
+        # ⬇️ WAŻNE: pakujemy do dicta z kluczami "attributes" i "default_ou"
+        config_data = {
+            "default_ou": default_ou,
+            "attributes": user_defaults
+        }
+
+        save_user_defaults(config_data)
+        flash("Settings saved successfully.", "success")
+        return redirect(url_for('main.settings'))
+
+    config = load_config()
+    current_defaults = config.get("attributes", {})
+    default_ou = config.get("default_ou", "CN=Users")
+
+    return render_template('settings.html', available=available_attrs, defaults=current_defaults, default_ou=default_ou)
