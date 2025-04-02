@@ -6,6 +6,7 @@
     "loginShell": "/bin/bash",
     "homeDirectory": "\\\\server\\users$\\{username}",
     "homeDrive": "I:",
-    "mail": "{username}@zut.edu.pl"
+    "mail": "{username}@zut.edu.pl",
+    "userAccountControl": 3145730
   }
 }

@@ -13,18 +13,18 @@ models_path = os.path.join(os.path.dirname(__file__), 'models')
 # Append the path to sys.path
 sys.path.append(models_path)
 
-
 # Import the necessary modules and functions
 from app.models.batch_add import import_users_from_file
 from werkzeug.utils import secure_filename
 from app.models import connection as co
-from app.models.block import change_users_block_status,get_blocked_users_count
-from app.models.all_users import get_all_users,get_all_users_count
+from app.models.block import change_users_block_status, get_blocked_users_count
+from app.models.all_users import get_all_users, get_all_users_count
 from app.config_utils import save_user_defaults, get_default_attributes, load_config
 from app.models.block import block_multiple_users
-from app.models.expire import expire_multiple_users,set_account_expiration,get_expiring_users_count
+from app.models.expire import expire_multiple_users, set_account_expiration, get_expiring_users_count
 from app.models.add import create_user
-from app.models.group_modify import add_user_to_group, remove_user_from_group,list_all_groups,list_group_members, remove_group, add_new_group, load_json_config
+from app.models.group_modify import add_user_to_group, remove_user_from_group, list_all_groups, list_group_members, \
+    remove_group, add_new_group, load_json_config
 from app.models.delete import *
 from app.models.batch_delete_users import *
 
@@ -32,8 +32,10 @@ main_routes = Blueprint('main', __name__)
 
 connection_global = None
 
+
 def flash_error(message):
     flash(message, 'danger')
+
 
 def domain_to_search_base(domain):
     # Split the domain string by the period (.)
@@ -42,13 +44,14 @@ def domain_to_search_base(domain):
     search_base = ','.join(f"dc={part}" for part in domain_parts)
     return search_base
 
+
 def parse_user_data2(user_data):
     # Wydzielenie domeny (wszystkie DC=...) oraz OU=...
     domain_parts = re.findall(r"DC=[^,]+", user_data)
     ou_parts = re.findall(r"OU=[^,]+", user_data)
     cn_parts = re.findall(r"CN=[^,]+", user_data)
 
-      # Dodanie 'Users' do ou_parts, jeśli CN=Users znajduje się w cn_parts
+    # Dodanie 'Users' do ou_parts, jeśli CN=Users znajduje się w cn_parts
     if any("CN=Users" in part for part in cn_parts):
         ou_parts.insert(0, "OU=Users")  # Dodaj 'Users' na początek ou_parts
 
@@ -56,26 +59,28 @@ def parse_user_data2(user_data):
     ou = "/".join(part.split('=')[1] for part in reversed(ou_parts)) if ou_parts else None
     # Join the domain parts with a dot
     domain = ".".join(part.split('=')[1] for part in domain_parts) if domain_parts else None
-    
+
     # Usuwamy CN=Users z cn_parts, jeżeli znajduje się w cn_parts
     cn_parts = [part for part in cn_parts if "CN=Users" not in part]  # Usuwamy CN=Users z cn_parts
     cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
 
     return domain, ou, cn
 
+
 def parse_user_data(user_data):
     # Wydzielenie domeny (wszystkie DC=...) oraz OU=...
     domain_parts = re.findall(r"DC=[^,]+", user_data)
     ou_parts = re.findall(r"OU=[^,]+", user_data)
-    cn_parts =  re.findall(r"CN=[^,]+", user_data)
+    cn_parts = re.findall(r"CN=[^,]+", user_data)
     # Join the domain parts with a dot
     domain = ".".join(part.split('=')[1] for part in domain_parts) if domain_parts else None
-    
+
     # Join the organizational units with a dot
     ou = "/".join(part.split('=')[1] for part in reversed(ou_parts)) if ou_parts else None
     cn = ".".join(part.split('=')[1] for part in cn_parts) if cn_parts else None
 
     return ou, domain, cn
+
 
 @main_routes.route('/search_user', methods=['POST'])
 def search_user():
@@ -83,7 +88,7 @@ def search_user():
     cn = user_data
     conn = get_ldap_connection()
     search_base = domain_to_search_base(domain=session.get('domain', 'default.local'))
-    user_list = get_all_users(conn, search_base,session.get('options'))
+    user_list = get_all_users(conn, search_base, session.get('options'))
 
     # Filter users with a matching 'cn'
     print(user_list)
@@ -93,7 +98,7 @@ def search_user():
     # Render the results in a template
     return render_template('search_user.html', matched_users=matched_users)
 
- 
+
 # Decorator requiring admin privileges
 def requires_admin(f):
     @wraps(f)
@@ -102,12 +107,14 @@ def requires_admin(f):
             flash('Brak uprawnień do wykonania tej akcji', 'danger')
             return redirect(url_for('main.index'))
         return f(*args, **kwargs)
+
     return decorated_function
 
 
 # Helper function to get LDAP connection
 def get_ldap_connection():
     return connection_global
+
 
 # Form validation
 def validate_form(fields):
@@ -138,14 +145,15 @@ def index():
         }
 
         # Retrieve the list of all users
-        selected = session.get('options',[])
-        columns = session.get('columns',[])
+        selected = session.get('options', [])
+        columns = session.get('columns', [])
         all_columns = selected + columns
 
         users = get_all_users(connection, search_base, all_columns)
 
         # Render the index page with user data
-        return render_template('index.html', login=session["login"], stats=stats, users=users, cols = columns , options=selected )
+        return render_template('index.html', login=session["login"], stats=stats, users=users, cols=columns,
+                               options=selected)
 
     except Exception as e:
         # Handle errors and redirect to the index page with an error message
@@ -154,6 +162,7 @@ def index():
 
 
 from flask import request, session, redirect, url_for, flash, render_template
+
 
 @main_routes.route('/checkbox_form', methods=['GET', 'POST'])
 def checkbox_form():
@@ -248,6 +257,7 @@ def login():
 
     return render_template('login.html')
 
+
 @main_routes.route('/logout')
 def logout():
     global connection_global  # Declare connection_global as global
@@ -260,20 +270,22 @@ def logout():
     session.pop('domain', None)
     return redirect(url_for('main.login'))
 
+
 @main_routes.route('/delete_user', methods=['GET', 'POST'])
 def delete_user():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
     connection = get_ldap_connection()  # Use the global LDAP connection
-    
+
     if request.method == 'POST':
         if 'selected_users' in request.form:
             return delete_user_post(connection)
         elif 'file' in request.files:
             return delete_user_file(connection)
-    
+
     return delete_user_get(connection)
+
 
 def delete_user_get(connection):
     if not connection:
@@ -282,21 +294,21 @@ def delete_user_get(connection):
     try:
         # Fetch user list for the form
         domain = session.get('domain', 'default.local')
-        #print("Domain:", domain)
+        # print("Domain:", domain)
         search_base = domain_to_search_base(domain)
-        #print("Search Base:", search_base)
-        
+        # print("Search Base:", search_base)
+
         selected = session.get('options')
         columns = session.get('columns')
         all = selected + columns
 
         users = get_all_users(connection, search_base, all)
-      
-        
-        return render_template('delete_user.html', users=users, cols = columns , options=selected)
+
+        return render_template('delete_user.html', users=users, cols=columns, options=selected)
     except Exception as e:
         flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
         return redirect(url_for('main.index'))
+
 
 def delete_user_post(connection):
     if not connection:
@@ -335,6 +347,7 @@ def delete_user_post(connection):
 
     return redirect(url_for('main.delete_user'))
 
+
 def delete_user_file(connection):
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
@@ -360,6 +373,7 @@ def delete_user_file(connection):
         flash_error(f"Wystąpił błąd podczas przetwarzania pliku: {str(e)}")
 
     return redirect(url_for('main.delete_user'))
+
 
 @main_routes.route('/add_user', methods=['GET', 'POST'])
 def add_user():
@@ -431,8 +445,10 @@ def add_user():
 
     return add_user_get()
 
+
 def add_user_get():
     return render_template('add_user.html')
+
 
 def add_user_post():
     username = request.form.get('username')
@@ -458,7 +474,7 @@ def add_user_post():
         search_base = dc
 
         # Call create_user
-        success = create_user(connection, username, first_name, last_name, password, dc, search_base,search_base)
+        success = create_user(connection, username, first_name, last_name, password, dc, search_base, search_base)
 
         if success:
             flash(f"User {username} created successfully.", "success")
@@ -483,8 +499,10 @@ def toggle_block_user():
             return toggle_block_user_post(connection)
         elif 'file' in request.files:
             return toggle_block_user_file(connection)
-    
+
     return toggle_block_user_get(connection)
+
+
 def toggle_block_user_get(connection):
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
@@ -498,11 +516,13 @@ def toggle_block_user_get(connection):
         all = selected + columns
 
         users = get_all_users(connection, search_base, all)
-        
-        return render_template('block_user.html', users=users, cols = columns ,options=selected)
+
+        return render_template('block_user.html', users=users, cols=columns, options=selected)
     except Exception as e:
         flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
         return redirect(url_for('main.index'))
+
+
 def toggle_block_user_post(connection):
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
@@ -540,6 +560,8 @@ def toggle_block_user_post(connection):
         flash_error(f"Wystąpiły błędy podczas zmiany statusu blokady: {', '.join(errors)}.")
 
     return redirect(url_for('main.toggle_block_user'))
+
+
 def toggle_block_user_file(connection):
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
@@ -672,16 +694,14 @@ def handle_get_request(connection):
         # Fetch user list for the form
         domain = session.get('domain', 'testad.local')
         search_base = domain_to_search_base(domain)
-        
+
         selected = session.get('options')
         columns = session.get('columns')
         all = selected + columns
 
-     
         users = get_all_users(connection, search_base, all)
-        
 
-        return render_template('expire_user.html', users=users, cols = columns , options=selected)
+        return render_template('expire_user.html', users=users, cols=columns, options=selected)
     except Exception as e:
         flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
         return redirect(url_for('main.index'))
@@ -720,10 +740,10 @@ def handle_post_group_modification(connection):
 
     # Process adding users
     process_user_addition(connection, add_users, domain, group_name, group_ou, successes, errors)
-    
+
     # Process removing users
     process_user_removal(connection, remove_users, domain, group_name, group_ou, successes, errors)
-    
+
     # Display results
     display_results(successes, errors)
     return redirect(url_for('main.modify_group_members'))
@@ -741,10 +761,10 @@ def process_user_addition(connection, add_users, domain, group_name, group_ou, s
     for username in add_users:
         try:
             if username:
-                #print(username)
+                # print(username)
                 _, users_ou, cn = parse_user_data2(username)
-                group_ou_parsed,_,_ = parse_user_data(group_ou)
-                #print(cn, domain, users_ou, group_name, domain, group_ou)
+                group_ou_parsed, _, _ = parse_user_data(group_ou)
+                # print(cn, domain, users_ou, group_name, domain, group_ou)
                 if group_ou_parsed:
                     success = add_user_to_group(connection, cn, domain, users_ou, group_name, domain, group_ou_parsed)
                 else:
@@ -763,12 +783,13 @@ def process_user_removal(connection, remove_users, domain, group_name, group_ou,
         try:
             if username:
                 _, users_ou, cn = parse_user_data2(username)
-                group_ou_parsed,_,_ = parse_user_data(group_ou)
+                group_ou_parsed, _, _ = parse_user_data(group_ou)
                 if group_ou_parsed:
-                    success = remove_user_from_group(connection, cn, domain, users_ou, group_name, domain, group_ou_parsed)
+                    success = remove_user_from_group(connection, cn, domain, users_ou, group_name, domain,
+                                                     group_ou_parsed)
                 else:
                     success = remove_user_from_group(connection, cn, domain, users_ou, group_name, domain, group_ou)
-            
+
                 if success:
                     successes.append(username)
                 else:
@@ -804,13 +825,14 @@ def handle_get_group_modification(connection):
             groups=groups,
             members=members,
             selected_group=selected_group,
-            cols= columns,
+            cols=columns,
             users=users,
-            options = session.get('options')
+            options=session.get('options')
         )
     except Exception as e:
         flash_error(f"Nie można pobrać listy grup: {str(e)}")
         return redirect(url_for('main.index'))
+
 
 @main_routes.route('/groups_management', methods=['GET', 'POST'])
 def groups_management():
@@ -909,21 +931,27 @@ def handle_get_group_management(connection, domain):
 def page_not_found(error):
     return render_template('page_not_found.html'), 404
 
+
 @main_routes.route('/settings', methods=['GET', 'POST'])
 def settings():
     available_attrs = [
         'gidNumber', 'unixHomeDirectory', 'loginShell',
         'homeDirectory', 'homeDrive', 'mail',
-        'description', 'telephoneNumber', 'title', 'department',
-        'company', 'employeeID', 'profilePath', 'scriptPath'
+        'userAccountControl', 'mSFU30Domain', 'mSFU30Name'
     ]
 
     if request.method == 'POST':
         user_defaults = {}
         for attr in available_attrs:
             value = request.form.get(attr)
-            if value:
-                user_defaults[attr] = value
+            if attr == "userAccountControl":
+                flags = request.form.getlist('uac_flags')
+                uac_sum = sum(int(f) for f in flags)
+                user_defaults[attr] = uac_sum
+            else:
+                value = request.form.get(attr)
+                if value:
+                    user_defaults[attr] = value
 
         default_ou = request.form.get('default_ou') or "CN=Users"
 
@@ -942,3 +970,5 @@ def settings():
     default_ou = config.get("default_ou", "CN=Users")
 
     return render_template('settings.html', available=available_attrs, defaults=current_defaults, default_ou=default_ou)
+
+
