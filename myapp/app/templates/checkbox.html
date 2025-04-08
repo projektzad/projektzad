@@ -11,12 +11,20 @@
                 <tr>
                     <th>Option</th>
                     <th>
-                        <input type="checkbox" id="selectAllColumns" onclick="toggleAll('column')">
-                        Use as Column
+                        <div class="d-flex align-items-center">
+                            <input class="form-check-input me-2" type="checkbox" id="selectAllColumns" onclick="toggleAllColumns(this.checked)">
+                            <label class="form-check-label" for="selectAllColumns">
+                                Use as Column
+                            </label>
+                        </div>
                     </th>
                     <th>
-                        <input type="checkbox" id="selectAllFilters" onclick="toggleAll('filter')">
-                        Filter Non-Empty
+                        <div class="d-flex align-items-center">
+                            <input class="form-check-input me-2" type="checkbox" id="selectAllFilters" onclick="toggleAllFilters(this.checked)">
+                            <label class="form-check-label" for="selectAllFilters">
+                                Use as Filter
+                            </label>
+                        </div>
                     </th>
                 </tr>
             </thead>
@@ -24,13 +32,13 @@
                 {% for option in options %}
                 <tr>
                     <td>{{ option }}</td>
-                    <td>
-                        <input type="checkbox" class="form-check-input column-checkbox" id="col_{{ option }}" 
+                    <td class="text-center">
+                        <input class="form-check-input column-checkbox" type="checkbox" id="col_{{ option }}" 
                                name="column_options" value="{{ option }}"
                                {% if option in preselected_columns %} checked {% endif %}>
                     </td>
-                    <td>
-                        <input type="checkbox" class="form-check-input filter-checkbox" id="filter_{{ option }}" 
+                    <td class="text-center">
+                        <input class="form-check-input filter-checkbox" type="checkbox" id="filter_{{ option }}" 
                                name="filter_options" value="{{ option }}"
                                {% if option in preselected_filters %} checked {% endif %}>
                     </td>
@@ -39,29 +47,68 @@
             </tbody>
         </table>
 
-        <!-- Buttons to select or deselect all -->
-        <div class="form-group">
-            <button type="button" class="btn btn-secondary" onclick="toggleAll('column', true)">Select All Columns</button>
-            <button type="button" class="btn btn-secondary" onclick="toggleAll('column', false)">Deselect All Columns</button>
-            <button type="button" class="btn btn-secondary" onclick="toggleAll('filter', true)">Select All Filters</button>
-            <button type="button" class="btn btn-secondary" onclick="toggleAll('filter', false)">Deselect All Filters</button>
-        </div>
-
         <button type="submit" class="btn btn-primary">Submit</button>
     </form>
 
     <script>
-        function toggleAll(type, state = null) {
-            let checkboxes;
-            if (type === 'column') {
-                checkboxes = document.querySelectorAll('.column-checkbox');
-            } else if (type === 'filter') {
-                checkboxes = document.querySelectorAll('.filter-checkbox');
-            }
-            
+        function toggleAllColumns(checked) {
+            const checkboxes = document.querySelectorAll('.column-checkbox');
             checkboxes.forEach(checkbox => {
-                checkbox.checked = state !== null ? state : !checkbox.checked;
+                checkbox.checked = checked;
             });
+            document.getElementById('selectAllColumns').checked = checked;
+            updateSelectAll('selectAllColumns', 'column-checkbox');
+        }
+
+        function toggleAllFilters(checked) {
+            const checkboxes = document.querySelectorAll('.filter-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = checked;
+            });
+            document.getElementById('selectAllFilters').checked = checked;
+            updateSelectAll('selectAllFilters', 'filter-checkbox');
+        }
+
+        // Update "Select All" checkboxes when individual checkboxes are clicked
+        document.addEventListener('DOMContentLoaded', function() {
+            const columnCheckboxes = document.querySelectorAll('.column-checkbox');
+            const filterCheckboxes = document.querySelectorAll('.filter-checkbox');
+            
+            columnCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    updateSelectAll('selectAllColumns', 'column-checkbox');
+                });
+            });
+            
+            filterCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    updateSelectAll('selectAllFilters', 'filter-checkbox');
+                });
+            });
+            
+            // Initialize the select all checkboxes
+            updateSelectAll('selectAllColumns', 'column-checkbox');
+            updateSelectAll('selectAllFilters', 'filter-checkbox');
+        });
+
+        function updateSelectAll(selectAllId, checkboxClass) {
+            const checkboxes = document.querySelectorAll(`.${checkboxClass}`);
+            const selectAll = document.getElementById(selectAllId);
+            
+            const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
+            const someChecked = Array.from(checkboxes).some(checkbox => checkbox.checked);
+            
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = someChecked && !allChecked;
         }
     </script>
+
+    <style>
+        .form-check-input {
+            margin-top: 0;
+        }
+        thead th {
+            vertical-align: middle;
+        }
+    </style>
 {% endblock %}
