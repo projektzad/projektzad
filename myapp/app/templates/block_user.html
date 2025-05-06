@@ -2,61 +2,58 @@
 
 {% block content %}
     <h2>Block/Unblock Users</h2>
-   <!-- Form for selecting users to block/unblock -->
-   <form method="post">
-    <th>
-        <input type="checkbox" id="selectAll">
-        <label for="selectAll">Select/Deselect All</label>
-    </th>
-    <input type="text" id="searchUser" class="form-control" placeholder="Search users...">
-    <table class="table" id="userTable">
-        <thead>
-            <tr>
-                <th>Select</th>
-                <!-- Dynamiczne generowanie nagłówków kolumn na podstawie cols -->
-                {% for col in cols %}
-                    <th>{{ col }} ⬍</th>
+    <form method="post">
+        <th>
+            <input type="checkbox" id="selectAll">
+            <label for="selectAll">Select/Deselect All</label>
+        </th>
+        <input type="text" id="searchUser" class="form-control" placeholder="Search users...">
+        <table class="table" id="userTable">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    {% for col in cols %}
+                        <th>{{ col }} ⬍</th>
+                    {% endfor %}
+                    <th>Attributes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="{% if user.is_disabled %}bg-danger text-white{% else %}bg-success text-white{% endif %}">
+                    <td>
+                        <input type="checkbox" name="selected_users" value="{{ user.name }}|{{ user.distinguishedName }}"
+                               {% if user.name in options or user.distinguishedName in options %}checked{% endif %}>
+                    </td>
+                    {% for col in cols %}
+                        <td>
+                            {{ user[col] if user[col] else 'N/A' }}
+                            {% if col == 'name' and user.is_disabled %} 🔒 {% endif %}
+                        </td>
+                    {% endfor %}
+                    <td>
+                        <button type="button" class="btn btn-info btn-sm toggle-attributes"
+                                data-target="#attributes-{{ loop.index }}">
+                            Show Attributes
+                        </button>
+                        <div id="attributes-{{ loop.index }}" class="collapse">
+                            <ul>
+                                {% for key, value in user.items() %}
+                                    {% if key not in cols %}
+                                        <li><strong>{{ key }}:</strong> {{ value }}</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
                 {% endfor %}
-                <th>Attributes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users %}
-            <tr>
-                <td>
-                    <!-- Checkbox do zaznaczania użytkowników -->
-                    <input type="checkbox" name="selected_users" value="{{ user.name }}|{{ user.distinguishedName }}"
-                           {% if user.name in options or user.distinguishedName in options %}checked{% endif %}>
-                </td>
-                <!-- Dynamiczne generowanie komórek tabeli na podstawie cols -->
-                {% for col in cols %}
-                    <td>{{ user[col] if user[col] else 'N/A' }}</td>
-                {% endfor %}
-                <td>
-                    <button type="button" class="btn btn-info btn-sm toggle-attributes" 
-                            data-target="#attributes-{{ loop.index }}">
-                        Show Attributes
-                    </button>
-                    <div id="attributes-{{ loop.index }}" class="collapse">
-                        <ul>
-                            {% for key, value in user.items() %}
-                                {% if key not in cols %}
-                                    <li><strong>{{ key }}:</strong> {{ value }}</li>
-                                {% endif %}
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </tbody>
+        </table>
         <button type="submit" class="btn btn-danger">Toggle Block Status</button>
     </form>
 
     <hr>
-
-    <!-- File upload section for blocking/unblocking users -->
     <h3>Or block/unblock users via file upload</h3>
     <form method="post" enctype="multipart/form-data">
         <label for="file">Upload CSV or Excel File:</label>

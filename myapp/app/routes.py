@@ -511,17 +511,24 @@ def toggle_block_user_get(connection):
     try:
         domain = session.get('domain', 'default.local')
         search_base = domain_to_search_base(domain)
-        selected = session.get('options')
-        columns = session.get('columns')
-        all = selected + columns
+        selected = session.get('options', [])
+        columns = session.get('columns', [])
 
+        if "userAccountControl" not in selected + columns:
+            selected.append("userAccountControl")
+
+        all = selected + columns
         users = get_all_users(connection, search_base, all)
 
+        for user in users:
+            flags_str = str(user.get("userAccountControl", "")).lower()
+            user["is_disabled"] = "accountdisable" in flags_str
+
         return render_template('block_user.html', users=users, cols=columns, options=selected)
+
     except Exception as e:
         flash_error(f"Nie można pobrać listy użytkowników: {str(e)}")
         return redirect(url_for('main.index'))
-
 
 def toggle_block_user_post(connection):
     if not connection:

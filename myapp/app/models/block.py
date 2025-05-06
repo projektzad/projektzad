@@ -47,21 +47,24 @@ def block_user_account(conn, canonical_name: str, domain: str, organizational_un
     Returns:
         bool: True if the operation was successful, False otherwise.
     """
-
-    user_dn=create_distinguished_name(username=canonical_name, domain=domain, organizational_unit=organizational_unit)
-    
+    user_dn = create_distinguished_name(username=canonical_name, domain=domain, organizational_unit=organizational_unit)
     conn.search(user_dn, '(objectClass=person)', attributes=['userAccountControl'])
-    
     if conn.entries:
         user_account_control = conn.entries[0].userAccountControl.value
-        
         if user_account_control & 2 != 2:
             new_account_control = user_account_control | 2
-            
-            conn.modify(user_dn, {'userAccountControl': [(MODIFY_REPLACE, [new_account_control])]})
-            
-            return conn.result['result'] == 0
-    
+
+            success = conn.modify(user_dn, {'userAccountControl': [(MODIFY_REPLACE, [new_account_control])]})
+
+            if not success:
+                print(f"❌ Błąd modyfikacji konta '{canonical_name}': {conn.result}")
+
+            return success
+        else:
+            print(f"ℹ️ Konto '{canonical_name}' już jest zablokowane.")
+            return True
+    else:
+        print(f"❌ Nie znaleziono użytkownika: {user_dn}")
     return False
 
 def block_multiple_users(conn, file_path: str) -> int:
@@ -78,15 +81,20 @@ def block_multiple_users(conn, file_path: str) -> int:
         int: The number of users successfully processed.
     """
     processed_count = 0
+    try:
+        file_extension = file_path.split('.')[-1].lower()
 
-    file_extension = file_path.split('.')[-1].lower()
+        if file_extension == 'csv':
+            processed_count = csv_blocking(conn, file_path=file_path)
 
-    if file_extension == 'csv':
-        processed_count = csv_blocking(conn,file_path=file_path,)
+        elif file_extension == 'xlsx':
+            processed_count = excel_blocking(conn, file_path=file_path)
 
-    elif file_extension == 'xlsx':
-        processed_count = excel_blocking(conn,file_path=file_path,)
-        
+        else:
+            print(f"Nieobsługiwane rozszerzenie pliku: {file_extension}")
+    except Exception as e:
+        print(f"Wystąpił wyjątek podczas przetwarzania pliku: {e}")
+
     return processed_count
 
 
@@ -101,16 +109,26 @@ def csv_blocking(conn,file_path: str) -> int:
         int: The number of users successfully processed.
     """
     processed_count = 0
-    with open(file_path, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.reader(file)
-        next(reader)
-        for row in reader:
-            if row:
+    try:
+        with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            header = next(reader)
+            for row in reader:
+                if len(row) < 3:
+                    print(f"Pominięto niekompletny wiersz: {row}")
+                    continue
                 canonical_name = row[0].strip()
                 domain = row[1].strip()
-                organizational_unit = row[2].strip() 
+                organizational_unit = row[2].strip()
+
+                print(f"Przetwarzanie: {canonical_name}, {domain}, {organizational_unit}")
+
                 if block_user_account(conn, canonical_name, domain, organizational_unit):
                     processed_count += 1
+                else:
+                    print(f"Nie udało się zablokować konta: {canonical_name}")
+    except Exception as e:
+        print(f"Błąd podczas przetwarzania CSV: {e}")
 
     return processed_count
 
