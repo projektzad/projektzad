@@ -560,7 +560,6 @@ def toggle_block_user_post(connection):
         except ValueError:
             errors.append(f"Nieprawidłowy format danych użytkownika: {user_data}")
 
-    # Komunikaty o sukcesie i błędach
     if successes:
         flash(f"Status blokady użytkowników {', '.join(successes)} został zmieniony.", "success")
     if errors:
@@ -677,15 +676,15 @@ def handle_file_upload(connection):
     file.save(file_path)
 
     # Process file based on type (Excel or CSV)
+    # Process file based on type (Excel or CSV)
     try:
         if file.filename.endswith('.xlsx') or file.filename.endswith('.csv'):
-            blocked_count = expire_multiple_users(connection, file_path)
+            expired_count = expire_multiple_users(connection, file_path)
         else:
             flash_error("Tylko pliki Excel (.xlsx) i CSV są obsługiwane.")
             return redirect(url_for('main.expire_user'))
-
-        if blocked_count:
-            flash(f"{blocked_count} użytkowników zostało pomyślnie zablokowanych/odblokowanych z pliku.", 'success')
+        if expired_count:
+            flash(f"{expired_count} użytkowników otrzymało datę wygaśnięcia z pliku.", 'success')
         else:
             flash_error("Wystąpił błąd podczas przetwarzania pliku.")
 
