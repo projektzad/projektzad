@@ -82,30 +82,6 @@ def parse_user_data(user_data):
     return ou, domain, cn
 
 
-@main_routes.route('/search_user', methods=['POST'])
-def search_user():
-    user_data = request.form.get('user_data', '').strip()
-    cn = user_data
-
-    # Połączenie z LDAP
-    session_id = session.get('session_id')
-    if not session_id:
-        flash_error("No active session. Please log in again.")
-        return redirect(url_for('main.login'))
-    conn = get_ldap_connection(session_id)
-
-    
-    search_base = domain_to_search_base(domain=session.get('domain', 'default.local'))
-    user_list = get_all_users(conn, search_base, session.get('options'))
-
-    # Filter users with a matching 'cn'
-    print(user_list)
-    matched_users = [user for user in user_list if cn.lower() in user.get("cn", "").lower()]
-    print("MatcherUsers")
-    print(matched_users)
-    # Render the results in a template
-    return render_template('search_user.html', matched_users=matched_users)
-
 
 # Decorator requiring admin privileges
 def requires_admin(f):
@@ -149,8 +125,6 @@ def index():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-
-    
     domain = session.get('domain', 'default.local')
     search_base = domain_to_search_base(domain)
     
@@ -281,6 +255,8 @@ def login():
             session['login'] = login
             session['ldap_server'] = ldap_server
             session['domain'] = domain
+            session['columns'] = ["name", "distinguishedName"]
+            session['options'] = []
 
             set_ldap_connection(session_id, connection)
             return redirect(url_for('main.index'))
