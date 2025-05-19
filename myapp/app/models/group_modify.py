@@ -31,7 +31,8 @@ def list_all_groups(conn, domain: str) -> tuple:
         if "OU=" in distinguished_name:
             # Extract the OU part from the distinguishedName
             ou = ', '.join([part for part in distinguished_name.split(',') if part.startswith("OU=")])
-        
+        if "CN=Users" in distinguished_name:
+            ou = "CN=Users"
         # Add the group name and OU to their respective lists
         group_list.append(cn)
         ou_list.append(ou if ou else "")  # If no OU found, append an empty string
@@ -152,7 +153,8 @@ def load_json_config(file_path: str) -> dict:
     return data
 
 def remove_group(conn,group, group_domain, group_ou) -> bool:
-    group_DN = create_distinguished_name(group, group_domain, group_ou, is_group=True)
+    group_DN = create_distinguished_name(group, group_domain, "CN=Users", is_group=True)
+    print(group_DN)
     return conn.delete(group_DN)
 
 def add_new_group(conn, config) -> bool:

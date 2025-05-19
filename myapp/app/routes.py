@@ -959,12 +959,14 @@ def delete_group(connection, domain, group_name):
         groups, oulist = list_all_groups(connection, domain)
         group_ou = oulist[groups.index(group_name)] if group_name in groups else None
 
+        print("Group OU:", group_ou)
+        
         if not group_ou:
             flash_error(f"Group '{group_name}' not found.")
             return redirect(url_for('main.groups_management'))
 
         _, group_ou, _ = parse_user_data2(group_ou)
-
+        
         success = remove_group(connection, group_name, domain, group_ou)
         if success:
             flash(f"Group '{group_name}' deleted successfully.", "success")

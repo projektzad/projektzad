@@ -63,44 +63,40 @@ def get_users_password_from_env_variable(env_variable_name: str) -> (bool, str):
     except Exception:
         return (False, "")
 
-def create_distinguished_name(username: str, domain: str, organizational_unit: str = "Users", is_group: bool = False) -> str:
+def create_distinguished_name(username: str, domain: str, organizational_unit: str, is_group: bool = False) -> str:
     """
-    Combines arguments into a distinguished name (necessary to authenticate to Active Directory).
-    Supports nested Organizational Units (OUs) separated by '/'.
+    Creates a distinguished name (DN) for a user or group.
 
     Args:
-        username (str): The username of the user.
-        domain (str): The domain in the format: subdomain.domain.local (e.g., "example.domain.local").
-        organizational_unit (str): The organizational unit (OU) where the user is located.
-                                   Can be a single OU (e.g., "Users") or multiple nested OUs separated by '/' 
-                                   (e.g., "OU=testOU/nestedOU1/nestedOU2").
-                                   Default is "Users".
+        username: The username or group name.
+        domain: The domain (e.g., "sub.domain.local").
+        organizational_unit: The organizational unit (OU) or container.
+                           If the object is in the Users container, this should be "CN=Users".
+        is_group:  True if the DN is for a group, False for a user.
 
     Returns:
-        str: The distinguished name (DN) in the format:
-             "CN=username,OU=organizational_unit1,OU=organizational_unit2,...,DC=subdomain,DC=domain,DC=local".
+        The distinguished name (DN).
+
+    Raises:
+        ValueError: If organizational_unit is empty and is_group is True.
     """
     domain_parts = domain.split(".")
-    
+    dn = f"CN={username},"
 
-    if "/" in organizational_unit:
+    if not organizational_unit:
+        if is_group:
+            raise ValueError("organizational_unit cannot be empty for a group")
+        else:
+            dn += "CN=Users,"  # Default for users.
+    elif "/" in organizational_unit:
         ou_parts = organizational_unit.split("/")
         ou_parts.reverse()
-        ou_dn = ",".join([f"OU={ou}" for ou in ou_parts])
-        dn = f"CN={username},{ou_dn}," + ",".join([f"DC={part}" for part in domain_parts])
+        dn += ",".join([f"OU={ou}" for ou in 
+                        ou_parts]) + ","
     else:
-        if not is_group:
-            if organizational_unit == "Users":
-                dn = f"CN={username},CN={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
-            else:
-                dn = f"CN={username},OU={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
-        else:
-            if organizational_unit == "":         
-                dn = f"CN={username}," + ",".join([f"DC={part}" for part in domain_parts])
-            else:
-                dn = f"CN={username},OU={organizational_unit}," + ",".join([f"DC={part}" for part in domain_parts])
+        dn += f"{organizational_unit},"
 
-
+    dn += ",".join([f"DC={part}" for part in domain_parts])
     return dn
 
 def correct_username(username: str, domain: str) -> str:
