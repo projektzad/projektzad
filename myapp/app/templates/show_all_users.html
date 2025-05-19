@@ -18,6 +18,7 @@
         </thead>
         <tbody>
             {% for user in users %}
+            {% set user_index = loop.index %}
             <tr>
                 {% for col in cols %}
                     <td>{{ user[col] if user[col] else '—' }}</td>
@@ -26,27 +27,26 @@
                 <!-- GRUPY Z ROZWIJANIEM -->
                 <td>
                     <button type="button" class="btn btn-sm btn-secondary mb-2" data-toggle="collapse"
-                            data-target="#groupbox-{{ loop.index }}">
+                            data-target="#groupbox-{{ user_index }}">
                         Pokaż grupy
                     </button>
 
-                    <div id="groupbox-{{ loop.index }}" class="collapse">
+                    <div id="groupbox-{{ user_index }}" class="collapse">
                         <form method="post" action="{{ url_for('main.update_user_groups') }}">
                             <input type="hidden" name="user_dn" value="{{ user['distinguishedName'] }}">
 
                             <div class="mb-2">
                                 <button type="button" class="btn btn-sm btn-outline-success"
-                                        onclick="toggleCheckboxes('{{ loop.index }}', true)">Zaznacz wszystkie</button>
+                                        onclick="toggleCheckboxes('{{ user_index }}', true)">Zaznacz wszystkie</button>
                                 <button type="button" class="btn btn-sm btn-outline-danger"
-                                        onclick="toggleCheckboxes('{{ loop.index }}', false)">Odznacz wszystkie</button>
+                                        onclick="toggleCheckboxes('{{ user_index }}', false)">Odznacz wszystkie</button>
                             </div>
 
                             <div class="form-check">
                                 {% for group in groups %}
                                     <div class="form-check">
-                                        <input class="form-check-input group-checkbox-{{ loop.index }}"
-       type="checkbox" name="group_list" value="{{ group }}"
-       {% if group in user.memberOfList %}checked{% endif %}>
+                                        <input class="form-check-input group-checkbox-{{ user_index }}"
+                                               type="checkbox" name="group_list" value="{{ group }}"
                                                id="{{ user['cn'] }}-{{ group }}"
                                                {% if group in user.memberOfList %}checked{% endif %}>
                                         <label class="form-check-label" for="{{ user['cn'] }}-{{ group }}">
@@ -63,10 +63,10 @@
                 <!-- ATRYBUTY -->
                 <td>
                     <button type="button" class="btn btn-info btn-sm toggle-attributes"
-                            data-toggle="collapse" data-target="#attributes-{{ loop.index }}">
+                            data-toggle="collapse" data-target="#attributes-{{ user_index }}">
                         Pokaż
                     </button>
-                    <div id="attributes-{{ loop.index }}" class="collapse mt-2">
+                    <div id="attributes-{{ user_index }}" class="collapse mt-2">
                         <ul class="mb-0">
                             {% for key, value in user.items() %}
                                 {% if key not in cols %}
@@ -81,8 +81,6 @@
         </tbody>
     </table>
 </div>
-
-<!-- SKRYPTY -->
 <script>
     document.getElementById("searchUser").addEventListener("input", function () {
         const filter = this.value.toLowerCase();
