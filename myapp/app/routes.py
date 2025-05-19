@@ -6,6 +6,8 @@ import os
 from datetime import datetime
 import re
 import uuid
+from threading import Lock
+
 
 # Get the absolute path to the 'models' directory
 models_path = os.path.join(os.path.dirname(__file__), 'models')
@@ -29,8 +31,6 @@ from app.models.delete import *
 from app.models.batch_delete_users import *
 
 main_routes = Blueprint('main', __name__)
-
-connection_global = None
 
 
 def flash_error(message):
@@ -86,7 +86,15 @@ def parse_user_data(user_data):
 def search_user():
     user_data = request.form.get('user_data', '').strip()
     cn = user_data
-    conn = get_ldap_connection()
+
+    # Połączenie z LDAP
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    conn = get_ldap_connection(session_id)
+
+    
     search_base = domain_to_search_base(domain=session.get('domain', 'default.local'))
     user_list = get_all_users(conn, search_base, session.get('options'))
 
@@ -111,10 +119,24 @@ def requires_admin(f):
     return decorated_function
 
 
-# Helper function to get LDAP connection
-def get_ldap_connection():
-    return connection_global
 
+
+_ldap_connections = {}
+_lock = Lock()
+
+def set_ldap_connection(session_id, connection):
+    with _lock:
+        _ldap_connections[session_id] = connection
+
+def get_ldap_connection(session_id):
+    with _lock:
+        return _ldap_connections.get(session_id)
+
+def remove_ldap_connection(session_id):
+    with _lock:
+        conn = _ldap_connections.pop(session_id, None)
+        if conn:
+            conn.unbind()
 
 # Form validation
 def validate_form(fields):
@@ -127,9 +149,19 @@ def index():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
+
+    
     domain = session.get('domain', 'default.local')
     search_base = domain_to_search_base(domain)
-    connection = get_ldap_connection()
+    
+    # Połączenie z LDAP
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    connection = get_ldap_connection(session_id)
+
+
 
     # If there is no active LDAP connection, redirect to login
     if not connection:
@@ -233,41 +265,39 @@ def checkbox_form():
     )
 
 
+
 @main_routes.route('/login', methods=['GET', 'POST'])
 def login():
-    global connection_global  # Declare connection_global as global
     if request.method == 'POST':
         ldap_server = request.form['ldap_server']
         login = request.form['login']
         password = request.form['password']
         domain = request.form['domain']
-        [is_connected, connection] = co.connect_to_active_directory(ldap_server, login, password, domain)
 
+        is_connected, connection = co.connect_to_active_directory(ldap_server, login, password, domain)
         if is_connected:
-            session['ldap_server'] = ldap_server
+            session_id = str(uuid.uuid4())
+            session['session_id'] = session_id
             session['login'] = login
+            session['ldap_server'] = ldap_server
             session['domain'] = domain
-            session['columns'] = ["name", "distinguishedName"]
-            session['options'] = []
 
-            connection_global = connection  # Assign to the global variable
+            set_ldap_connection(session_id, connection)
             return redirect(url_for('main.index'))
         else:
-            return render_template('login.html', error="Błąd logowania. Proszę sprawdzić dane.")
-
+            return render_template('login.html', error="Błąd logowania.")
     return render_template('login.html')
+
 
 
 @main_routes.route('/logout')
 def logout():
-    global connection_global  # Declare connection_global as global
-    if connection_global:
-        co.disconnect_from_active_directory(connection_global)
-        connection_global = None  # Reset the global variable
 
     session.pop('login', None)
     session.pop('ldap_server', None)
     session.pop('domain', None)
+    session.pop('password', None)
+
     return redirect(url_for('main.login'))
 
 
@@ -275,8 +305,13 @@ def logout():
 def delete_user():
     if 'login' not in session:
         return redirect(url_for('main.login'))
-
-    connection = get_ldap_connection()  # Use the global LDAP connection
+    
+    # Połączenie z LDAP
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    connection = get_ldap_connection(session_id)
 
     if request.method == 'POST':
         if 'selected_users' in request.form:
@@ -426,7 +461,13 @@ def add_user():
             domain = session.get('domain')
             dc = ','.join([f"DC={x}" for x in domain.split('.')])
             search_base = dc
-            connection = get_ldap_connection()
+
+            session_id = session.get('session_id')
+            if not session_id:
+                flash("No active session. Please log in again.", "danger")
+                return redirect(url_for('main.login'))
+            
+            connection = get_ldap_connection(session_id)
             result = import_users_from_file(connection, filepath, dc, search_base)
             if 'error' in result:
                 flash(result['error'], 'danger')
@@ -462,7 +503,12 @@ def add_user_post():
         return render_template('add_user.html')
 
     # Połączenie z LDAP
-    connection = get_ldap_connection()
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    connection = get_ldap_connection(session_id)
+   
     if not connection:
         flash_error("No connection to Active Directory.")
         return redirect(url_for('main.login'))
@@ -492,7 +538,12 @@ def toggle_block_user():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    connection = get_ldap_connection()
+    # Połączenie z LDAP
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    connection = get_ldap_connection(session_id)
 
     if request.method == 'POST':
         if 'selected_users' in request.form:
@@ -604,7 +655,13 @@ def expire_user():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    connection = get_ldap_connection()  # Get the LDAP connection
+    # Połączenie z LDAP
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    connection = get_ldap_connection(session_id)
+
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
         return redirect(url_for('main.login'))
@@ -719,7 +776,13 @@ def modify_group_members():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    connection = get_ldap_connection()
+    # Połączenie z LDAP
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    connection = get_ldap_connection(session_id)
+
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
         return redirect(url_for('main.login'))
@@ -846,7 +909,13 @@ def groups_management():
     if 'login' not in session:
         return redirect(url_for('main.login'))
 
-    connection = get_ldap_connection()
+    # Połączenie z LDAP
+    session_id = session.get('session_id')
+    if not session_id:
+        flash_error("No active session. Please log in again.")
+        return redirect(url_for('main.login'))
+    connection = get_ldap_connection(session_id)
+
     if not connection:
         flash_error("Brak połączenia z Active Directory.")
         return redirect(url_for('main.index'))
