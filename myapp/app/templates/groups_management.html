@@ -4,6 +4,18 @@
 <div class="mt-4">
     <h1>Group Management</h1>
 
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <!-- Form to add a new group -->
     <form method="POST" action="{{ url_for('main.groups_management') }}" class="mb-4">
         <input type="hidden" name="action" value="add">
@@ -11,11 +23,11 @@
             <label for="group_name">Add New Group:</label>
             <input type="text" class="form-control" id="group_name" name="group_name" placeholder="Enter group name" required>
         </div>
-        <button type="submit" class="btn btn-success">Add Group</button>
+        <button type="submit" class="btn btn-success mt-2">Add Group</button>
     </form>
 
     <h2>Existing Groups</h2>
-    <input type="text" id="searchAdd" class="form-control" placeholder="Search users...">
+    <input type="text" id="searchAdd" class="form-control mb-3" placeholder="Search groups...">
     <table class="table" id="Table">
         {% if groups %}
             <thead>
@@ -32,7 +44,7 @@
                             <form method="POST" action="{{ url_for('main.groups_management') }}" class="d-inline">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="group_name" value="{{ group }}">
-                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                <button type="submit" class="btn btn-danger btn-sm" title="Delete group">Delete</button>
                             </form>
                         </td>
                     </tr>
@@ -44,7 +56,6 @@
             </tr>
         {% endif %}
     </table>
-    
 </div>
 
 <script>
@@ -56,12 +67,11 @@
         let input = document.getElementById(inputId).value.toLowerCase();
         let table = document.getElementById(tableId);
         let rows = table.getElementsByTagName('tr');
-        
+
         for (let i = 1; i < rows.length; i++) {
             let cells = rows[i].getElementsByTagName('td');
             let match = false;
 
-            // Only search through the first td (Group Name column)
             if (cells.length > 0 && cells[0].textContent.toLowerCase().includes(input)) {
                 match = true;
             }

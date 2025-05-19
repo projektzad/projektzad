@@ -1,13 +1,18 @@
 from ldap3 import MODIFY_ADD, MODIFY_DELETE, MODIFY_REPLACE
 from connection_utlis import create_distinguished_name
 import openpyxl, csv, json
-# to do: testowanie tego + wgrywanie configu (dodawnie lub modyfikowanie grupy, moze usuwanie grupy)
 
 
 def domain_to_dn(domain:str) -> str:
     parts = domain.split('.')
     dn = ','.join([f"dc={part}" for part in parts])
     return dn
+
+def create_group_dn(group_name, domain, container="CN=Users"):
+    dn = domain_to_dn(domain).replace("dc=", "DC=")
+    return f"CN={group_name},{container},{dn}"
+
+
 
 def list_all_groups(conn, domain: str) -> tuple:
     group_list = []
@@ -151,36 +156,30 @@ def remove_group(conn,group, group_domain, group_ou) -> bool:
     return conn.delete(group_DN)
 
 def add_new_group(conn, config) -> bool:
-
-    objectClass = ['top', 'group']
-    if "OU=" in config.get('group_DN'):
-        objectClass = ['top', 'group', 'organizationalUnit']
-    """
     try:
+        group_name = config['General']['Group name (pre-Windows 2000)']
+        domain_dn = conn.server.info.other['defaultNamingContext'][0]
+        group_dn = f"CN={group_name},CN=Users,{domain_dn}"
+
         attributes = {
-            'objectClass': objectClass,  
-            'cn': config['General']['Group name (pre-Windows 2000)'],
-            'description': config['General']['Notes'],
-            'E-mail': config['General']['E-mail'],
-            'sAMAccountName': group_samaccountname,
-            'groupType': 0x80000002,
+            'objectClass': ['top', 'group'],
+            'cn': group_name,
+            'description': config['General'].get('Notes', ''),
+            'mail': config['General'].get('E-mail', ''),
+            'sAMAccountName': group_name,
+            'groupType': 0x80000002
         }
-        conn.add(group_dn, attributes=attributes)
+
+        success = conn.add(group_dn, attributes=attributes)
+        if not success:
+            print("❌ LDAP error:", conn.result)  # <-- to tylko do debugowania
+            return False
+
+        return True
+
     except Exception:
-        return -1
-    """
+        return False
 
-
-    for member in config['Members']:
-        user = member['User, Service Account, Group, or Other Object DN']
-        group = config['group_DN']
-        if member['action'] == 'remove':
-            conn.extend.microsoft.remove_members_from_groups(user,group)
-        elif member['action'] == 'add':
-            conn.extend.microsoft.add_members_to_groups(user, group)
-        else: 
-            return -1
-            
 
 def process_config_file(conn, file_path: str) -> bool:
     
@@ -254,6 +253,14 @@ def list_group_members(conn, domain: str, group_name: str) -> list:
         print(f"An error occurred while listing members of the group {group_name}: {e}")
 
         return []
+
+def add_user_to_group_by_dn(conn, user_dn, group_dn):
+    return conn.extend.microsoft.add_members_to_groups(user_dn, group_dn)
+
+def remove_user_from_group_by_dn(conn, user_dn, group_dn):
+    return conn.extend.microsoft.remove_members_from_groups(user_dn, group_dn)
+
+
 
  
 

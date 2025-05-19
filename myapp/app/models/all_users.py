@@ -75,5 +75,13 @@ def get_all_users_count(conn, search_base: str) -> int:
     users = get_all_users(conn, search_base)
     return len(users)
 
+def get_user_groups(conn, user_dn):
+    conn.search(user_dn, '(objectClass=*)', attributes=['memberOf'])
+    if conn.entries:
+        groups = conn.entries[0].memberOf.values if 'memberOf' in conn.entries[0] else []
+        return [g.split(',')[0].replace('CN=', '') for g in groups]
+    return []
+
+
 
 

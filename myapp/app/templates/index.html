@@ -19,52 +19,6 @@
                 </div>
             </div>
         </div>
-
-        {% if users %}
-            <div class="container-fluid">
-                <table class="table" id="userTable">
-                    <thead>
-                        <tr>
-                            
-                            <!-- Dynamiczne generowanie nagłówków kolumn na podstawie cols -->
-                            {% for col in cols %}
-                                <th>{{ col }} ⬍</th>
-                            {% endfor %}
-                            <th>Attributes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr>
-                            
-                            <!-- Dynamiczne generowanie komórek tabeli na podstawie cols -->
-                            {% for col in cols %}
-                                <td>{{ user[col] if user[col] else 'N/A' }}</td>
-                            {% endfor %}
-                            <td>
-                                <button type="button" class="btn btn-info btn-sm toggle-attributes" 
-                                        data-target="#attributes-{{ loop.index }}">
-                                    Show Attributes
-                                </button>
-                                <div id="attributes-{{ loop.index }}" class="collapse">
-                                    <ul>
-                                        {% for key, value in user.items() %}
-                                            {% if key not in cols %}
-                                                <li><strong>{{ key }}:</strong> {{ value }}</li>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <p class="text-center">No users.</p>
-        {% endif %}
-
     {% else %}
         <p class="text-center">Please log in to access the features.</p>
     {% endif %}
