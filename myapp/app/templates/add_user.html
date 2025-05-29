@@ -1,36 +1,51 @@
-<!-- templates/add_user.html -->
 {% extends 'base.html' %}
 
 {% block content %}
-    <h2>Add User</h2>
-    <form method="post">
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" class="form-control" id="username" name="username" required>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Add Single User</h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="first_name">First Name</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name</label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">Add User</button>
+                </form>
+            </div>
         </div>
-        <div class="form-group">
-            <label for="first_name">First Name</label>
-            <input type="text" class="form-control" id="first_name" name="first_name" required>
-        </div>
-        <div class="form-group">
-            <label for="last_name">Last Name</label>
-            <input type="text" class="form-control" id="last_name" name="last_name" required>
-        </div>
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" class="form-control" id="password" name="password" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Add User</button>
-    </form>
-    <hr>
-<h4>Add Users from CSV or XLSX</h4>
-<form method="post" enctype="multipart/form-data">
-    <div class="form-group">
-        <label for="file">Select File:</label>
-        <input type="file" class="form-control" id="file" name="file" accept=".csv,.xlsx,.xls" required>
     </div>
-    <button type="submit" class="btn btn-secondary mt-2">Import Users</button>
-</form>
-<p class="text-muted mt-2">Required columns: <code>username, first_name, last_name, password</code></p>
-
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3>Add Users from File</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="file">Select CSV or XLSX File:</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".csv,.xlsx,.xls" required>
+                    </div>
+                    <button type="submit" class="btn btn-secondary mt-3">Preview & Import Users</button>
+                    <p class="text-muted mt-2">Required columns: <code>username, first_name, last_name, password</code></p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
