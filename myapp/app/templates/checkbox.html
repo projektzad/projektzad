@@ -2,7 +2,7 @@
 
 {% block content %}
     <h1>Select Options</h1>
-    
+
     <form method="POST" action="{{ url_for('main.checkbox_form') }}">
         <input type="hidden" name="previous_url" value="{{ request.referrer }}">
 
@@ -33,12 +33,12 @@
                 <tr>
                     <td>{{ option }}</td>
                     <td class="text-center">
-                        <input class="form-check-input column-checkbox" type="checkbox" id="col_{{ option }}" 
+                        <input class="form-check-input column-checkbox" type="checkbox" id="col_{{ option }}"
                                name="column_options" value="{{ option }}"
                                {% if option in preselected_columns %} checked {% endif %}>
                     </td>
                     <td class="text-center">
-                        <input class="form-check-input filter-checkbox" type="checkbox" id="filter_{{ option }}" 
+                        <input class="form-check-input filter-checkbox" type="checkbox" id="filter_{{ option }}"
                                name="filter_options" value="{{ option }}"
                                {% if option in preselected_filters %} checked {% endif %}>
                     </td>
@@ -73,19 +73,19 @@
         document.addEventListener('DOMContentLoaded', function() {
             const columnCheckboxes = document.querySelectorAll('.column-checkbox');
             const filterCheckboxes = document.querySelectorAll('.filter-checkbox');
-            
+
             columnCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
                     updateSelectAll('selectAllColumns', 'column-checkbox');
                 });
             });
-            
+
             filterCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
                     updateSelectAll('selectAllFilters', 'filter-checkbox');
                 });
             });
-            
+
             // Initialize the select all checkboxes
             updateSelectAll('selectAllColumns', 'column-checkbox');
             updateSelectAll('selectAllFilters', 'filter-checkbox');
@@ -94,10 +94,10 @@
         function updateSelectAll(selectAllId, checkboxClass) {
             const checkboxes = document.querySelectorAll(`.${checkboxClass}`);
             const selectAll = document.getElementById(selectAllId);
-            
+
             const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
             const someChecked = Array.from(checkboxes).some(checkbox => checkbox.checked);
-            
+
             selectAll.checked = allChecked;
             selectAll.indeterminate = someChecked && !allChecked;
         }
