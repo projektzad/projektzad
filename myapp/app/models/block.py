@@ -2,7 +2,7 @@ from connection_utlis import create_distinguished_name
 from ldap3 import MODIFY_REPLACE
 import csv, openpyxl
 
-def change_users_block_status(conn, canonical_name: str, domain: str, organizational_unit: str = "Users") -> bool:
+def change_users_block_status(conn, canonical_name: str, domain: str, organizational_unit: str = "CN=Users") -> bool:
     """
     Toggles the block status of a user in Active Directory. If the user is currently blocked,
     it will be unblocked. If the user is not blocked, it will be blocked.
@@ -20,6 +20,7 @@ def change_users_block_status(conn, canonical_name: str, domain: str, organizati
             - False if the user was not found or an error occurred during the modification.
     """
     user_dn=create_distinguished_name(username=canonical_name, domain=domain, organizational_unit=organizational_unit)
+    print(f"Przetwarzanie użytkownika: {user_dn}")
     conn.search(user_dn, '(objectClass=person)', attributes=['userAccountControl'])
     if conn.entries:
         user_account_control = conn.entries[0].userAccountControl.value

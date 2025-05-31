@@ -574,6 +574,10 @@ def toggle_block_user_post(connection):
         try:
             username, domain = user_data.split('|')
             ou, domain, cn = parse_user_data(domain)
+            print("Username:", username)
+            print("Domain:", domain)
+            print("OU:", ou)
+        
 
             if ou:
                 success = change_users_block_status(connection, username, domain, ou)

@@ -1,7 +1,7 @@
 import connection_utlis as cu
 
 
-def delete_user_from_active_directory(conn, username: str, domain: str, organizational_unit: str = "Users") -> bool:
+def delete_user_from_active_directory(conn, username: str, domain: str, organizational_unit: str = "CN=Users") -> bool:
     """
     Deletes a user from Active Directory (AD) using an existing connection.
     Args:

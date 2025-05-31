@@ -3,7 +3,7 @@ from datetime import datetime
 from ldap3 import MODIFY_REPLACE
 import openpyxl, csv
 
-def set_account_expiration(conn, canonical_name: str, domain: str, expiration_date: str, organizational_unit: str = "Users") -> bool:
+def set_account_expiration(conn, canonical_name: str, domain: str, expiration_date: str, organizational_unit: str = "CN=Users") -> bool:
     """
     Set the 'accountExpires' attribute for a user account in Active Directory.
 
