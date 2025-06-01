@@ -1,6 +1,6 @@
 import csv
 import openpyxl
-import connection_utlis as cu
+import connection_utils as cu
 from ldap3 import Connection, MODIFY_REPLACE
 
 

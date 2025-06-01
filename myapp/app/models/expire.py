@@ -1,4 +1,4 @@
-from connection_utlis import create_distinguished_name
+from connection_utils import create_distinguished_name
 from datetime import datetime
 from ldap3 import MODIFY_REPLACE
 import openpyxl, csv

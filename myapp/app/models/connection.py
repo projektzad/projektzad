@@ -1,5 +1,5 @@
 from ldap3 import Server, Connection, ALL
-import connection_utlis as cu
+import connection_utils as cu
 
 def connect_to_active_directory(ldap_server: str, username: str, password: str, domain: str) -> (bool, Connection):
     """

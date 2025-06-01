@@ -1,4 +1,4 @@
-import connection_utlis as cu
+import connection_utils as cu
 
 
 def delete_user_from_active_directory(conn, username: str, domain: str, organizational_unit: str = "CN=Users") -> bool:
