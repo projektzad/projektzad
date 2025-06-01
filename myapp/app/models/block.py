@@ -16,33 +16,30 @@ def change_users_block_status(conn, canonical_name: str, domain: str, organizati
             user_account_control = int(conn.entries[0].userAccountControl.value)
             pwd_last_set = conn.entries[0].pwdLastSet.value
         except Exception as e:
-            print(f"❌ Failed to parse userAccountControl or pwdLastSet: {e}")
+            print(f" Failed to parse userAccountControl or pwdLastSet: {e}")
             return False
 
-        print(f"🔍 Current userAccountControl: {user_account_control} ({bin(user_account_control)})")
-        print(f"🔍 pwdLastSet: {pwd_last_set}")
 
         if user_account_control & 2 == 2:
             # Currently disabled → enable
             new_account_control = user_account_control & ~2
-            print("🟢 Attempting to enable the account...")
+            print("Attempting to enable the account...")
 
             if pwd_last_set in [None, '0', 0]:
-                print("⚠️ Cannot enable account: pwdLastSet is 0 (user must change password at next login).")
+                print(" Cannot enable account: pwdLastSet is 0 (user must change password at next login).")
                 return False
         else:
             # Currently enabled → disable
             new_account_control = user_account_control | 2
-            print("🔴 Attempting to disable the account...")
+            print(" Attempting to disable the account...")
 
-        print(f"➡️ New userAccountControl: {new_account_control} ({bin(new_account_control)})")
 
         success = conn.modify(user_dn, {'userAccountControl': [(MODIFY_REPLACE, [str(new_account_control)])]})
         if not success:
-            print(f"❌ Modify failed: {conn.result}")
+            print(f"Modify failed: {conn.result}")
         return success
 
-    print(f"❌ User not found: {user_dn}")
+    print(f"User not found: {user_dn}")
     return False
 
 
@@ -51,31 +48,29 @@ def block_user_account(conn, canonical_name: str, domain: str, organizational_un
     Forcefully disables a user account in Active Directory by setting ACCOUNTDISABLE flag.
     """
     user_dn = create_distinguished_name(username=canonical_name, domain=domain, organizational_unit=organizational_unit)
-    print(f"🔒 Attempting to disable account: {user_dn}")
 
     conn.search(user_dn, '(objectClass=person)', attributes=['userAccountControl'])
     if conn.entries:
         try:
             user_account_control = int(conn.entries[0].userAccountControl.value)
         except Exception as e:
-            print(f"❌ Failed to parse userAccountControl: {e}")
+            print(f"Failed to parse userAccountControl: {e}")
             return False
 
-        print(f"🔍 Current userAccountControl: {user_account_control} ({bin(user_account_control)})")
 
         if user_account_control & 2 != 2:
             new_account_control = user_account_control | 2
-            print(f"🔴 Setting userAccountControl to {new_account_control} ({bin(new_account_control)})")
+            print(f"Setting userAccountControl to {new_account_control} ({bin(new_account_control)})")
 
             success = conn.modify(user_dn, {'userAccountControl': [(MODIFY_REPLACE, [str(new_account_control)])]})
             if not success:
-                print(f"❌ Failed to disable account '{canonical_name}': {conn.result}")
+                print(f"Failed to disable account '{canonical_name}': {conn.result}")
             return success
         else:
-            print(f"ℹ️ Account '{canonical_name}' is already disabled.")
+            print(f"ℹAccount '{canonical_name}' is already disabled.")
             return True
     else:
-        print(f"❌ User not found: {user_dn}")
+        print(f"User not found: {user_dn}")
     return False
 
 
@@ -92,9 +87,9 @@ def block_multiple_users(conn, file_path: str) -> int:
         elif file_extension == 'xlsx':
             processed_count = excel_blocking(conn, file_path)
         else:
-            print(f"❌ Unsupported file extension: {file_extension}")
+            print(f"Unsupported file extension: {file_extension}")
     except Exception as e:
-        print(f"❌ Exception while processing file: {e}")
+        print(f"Exception while processing file: {e}")
 
     return processed_count
 
@@ -110,21 +105,21 @@ def csv_blocking(conn, file_path: str) -> int:
             header = next(reader)
             for row in reader:
                 if len(row) < 3:
-                    print(f"⚠️ Skipping incomplete row: {row}")
+                    print(f"Skipping incomplete row: {row}")
                     continue
 
                 canonical_name = row[0].strip()
                 domain = row[1].strip()
                 organizational_unit = row[2].strip()
 
-                print(f"📄 Processing: {canonical_name}, {domain}, {organizational_unit}")
+                print(f"Processing: {canonical_name}, {domain}, {organizational_unit}")
 
                 if block_user_account(conn, canonical_name, domain, organizational_unit):
                     processed_count += 1
                 else:
-                    print(f"❌ Failed to block user: {canonical_name}")
+                    print(f"Failed to block user: {canonical_name}")
     except Exception as e:
-        print(f"❌ Error reading CSV: {e}")
+        print(f"Error reading CSV: {e}")
 
     return processed_count
 
@@ -141,14 +136,14 @@ def excel_blocking(conn, file_path: str) -> int:
             canonical_name = row[0].value.strip()
             domain = row[1].value.strip()
             organizational_unit = row[2].value.strip()
-            print(f"📄 Processing from Excel: {canonical_name}, {domain}, {organizational_unit}")
+            print(f"Processing from Excel: {canonical_name}, {domain}, {organizational_unit}")
 
             if block_user_account(conn, canonical_name, domain, organizational_unit):
                 processed_count += 1
             else:
-                print(f"❌ Failed to block user: {canonical_name}")
+                print(f"Failed to block user: {canonical_name}")
     except Exception as e:
-        print(f"❌ Error reading Excel file: {e}")
+        print(f"Error reading Excel file: {e}")
 
     return processed_count
 
