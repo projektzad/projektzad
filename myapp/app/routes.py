@@ -81,9 +81,6 @@ def parse_user_data(user_data):
 
     return ou, domain, cn
 
-
-
-# Decorator requiring admin privileges
 def requires_admin(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -93,8 +90,6 @@ def requires_admin(f):
         return f(*args, **kwargs)
 
     return decorated_function
-
-
 
 
 _ldap_connections = {}
@@ -268,12 +263,13 @@ def login():
 
 @main_routes.route('/logout')
 def logout():
+    session_id = session.pop('session_id', None)
+    if session_id:
+        remove_ldap_connection(session_id)
 
     session.pop('login', None)
     session.pop('ldap_server', None)
     session.pop('domain', None)
-    session.pop('password', None)
-
     return redirect(url_for('main.login'))
 
 
