@@ -1,21 +1,34 @@
 // app/static/js/theme.js
 document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('theme-toggle');
-    const currentTheme = localStorage.getItem('theme') || 'light';
+    const moonIcon = document.getElementById('theme-icon-moon');
+    const sunIcon = document.getElementById('theme-icon-sun');
 
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    themeToggle.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+    let currentTheme = localStorage.getItem('theme') || 'light';
 
-    themeToggle.addEventListener('click', () => {
-        let theme = document.documentElement.getAttribute('data-theme');
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
         if (theme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'light');
-            localStorage.setItem('theme', 'light');
-            themeToggle.textContent = '🌙';
+            if (moonIcon) moonIcon.style.display = 'none';
+            if (sunIcon) sunIcon.style.display = 'inline';
         } else {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
-            themeToggle.textContent = '☀️';
+            if (moonIcon) moonIcon.style.display = 'inline';
+            if (sunIcon) sunIcon.style.display = 'none';
         }
-    });
+    }
+
+    applyTheme(currentTheme); // Apply initial theme
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            let theme = document.documentElement.getAttribute('data-theme');
+            if (theme === 'dark') {
+                currentTheme = 'light';
+            } else {
+                currentTheme = 'dark';
+            }
+            localStorage.setItem('theme', currentTheme);
+            applyTheme(currentTheme);
+        });
+    }
 });

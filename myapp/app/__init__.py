@@ -4,6 +4,7 @@ from .routes import main_routes  # Assuming routes.py is in the same directory
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+from datetime import datetime
 
 
 def create_app():
@@ -43,5 +44,9 @@ def create_app():
             return 0
 
     app.jinja_env.filters['bitwise_and'] = bitwise_and
+
+    @app.context_processor
+    def inject_now():
+        return {'current_year': datetime.utcnow().year}
 
     return app

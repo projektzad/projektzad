@@ -4,7 +4,6 @@ from functools import wraps
 from werkzeug.utils import secure_filename
 import sys
 import os
-from datetime import datetime
 import re
 import uuid
 from threading import Lock
@@ -40,13 +39,13 @@ from app.models.group_modify import (
 from app.models.delete import delete_user_from_active_directory
 from app.models.batch_delete_users import delete_multiple_users as batch_delete_users_from_file
 from connection_utils import create_distinguished_name  # Renamed import to connection_utils
+from datetime import datetime
 
 main_routes = Blueprint('main', __name__)
 
 # --- LDAP Connection Management ---
 _ldap_connections = {}
 _lock = Lock()
-
 
 def set_ldap_connection(session_id, connection):
     with _lock:
