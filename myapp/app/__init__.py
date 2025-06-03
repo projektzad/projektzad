@@ -14,7 +14,7 @@ def create_app():
     # Configure logging
     if not app.debug and not app.testing:
         if not os.path.exists('logs'):
-            os.mkdir('logs')
+            os.makedirs('logs', exist_ok=True)
 
         file_handler = RotatingFileHandler('logs/ldap_admin.log', maxBytes=102400, backupCount=10)  # Increased maxBytes
         file_handler.setFormatter(logging.Formatter(
