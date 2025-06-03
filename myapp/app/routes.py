@@ -40,62 +40,155 @@ from app.models.delete import delete_user_from_active_directory
 from app.models.batch_delete_users import delete_multiple_users as batch_delete_users_from_file
 from connection_utils import create_distinguished_name  # Renamed import to connection_utils
 from datetime import datetime
+import base64
+import os
 
 main_routes = Blueprint('main', __name__)
-
-# --- LDAP Connection Management ---
-_ldap_connections = {}
-_lock = Lock()
-
-def set_ldap_connection(session_id, connection):
-    with _lock:
-        _ldap_connections[session_id] = connection
+# Remove the global _ldap_connections dictionary and Redis code
+# Add these security-related imports
+import hashlib
+import hmac
+import secrets
+from cryptography.fernet import Fernet
 
 
-def get_ldap_connection(session_id):
-    with _lock:
-        return _ldap_connections.get(session_id)
+# --- Secure Connection Management ---
+def set_ldap_connection(ldap_server, login, encrypted_password, domain):
+    session['ldap_conn'] = {
+        'ldap_server': ldap_server,
+        'login': login,
+        'encrypted_password': encrypted_password,
+        'domain': domain
+    }
+
+def get_ldap_connection():
+    """Retrieves connection info from session"""
+    return session.get('ldap_conn')
+
+def remove_ldap_connection():
+    """Clears connection info from session"""
+    session.pop('ldap_conn', None)
+    session.pop('conn_salt', None)
+
+def verify_credentials(password):
+    """Verifies credentials against stored hash"""
+    conn_info = session.get('ldap_conn')
+    if not conn_info or 'conn_salt' not in session:
+        return False
+        
+    test_hash = hashlib.pbkdf2_hmac(
+        'sha256',
+        f"{conn_info['login']}:{password}".encode('utf-8'),
+        session['conn_salt'].encode('utf-8'),
+        100000
+    ).hex()
+    
+    return hmac.compare_digest(test_hash, conn_info['creds_hash'])
+
+# --- Add Teardown Handler ---
+@main_routes.teardown_request
+def teardown_request(exception=None):
+    """Clear temporary password after each request"""
+    if hasattr(g, 'temp_password'):
+        del g.temp_password
+    if hasattr(g, 'ldap_conn') and g.ldap_conn:
+        g.ldap_conn.unbind()
 
 
-def remove_ldap_connection(session_id):
-    with _lock:
-        conn = _ldap_connections.pop(session_id, None)
-        if conn:
-            try:
-                conn.unbind()
-            except Exception as e:
-                logger = getattr(current_app, 'logger', None)
-                if logger:
-                    logger.error(f"Error unbinding LDAP connection for session {session_id}: {e}", exc_info=True)
-                else:
-                    print(f"Error unbinding LDAP connection for session {session_id}: {e}")
+def get_fernet_key():
+    key = os.environ.get('FERNET_KEY')
+    if key:
+        return key.encode()  # It's already base64-encoded
 
+    # Fallback: Derive a valid Fernet key from the Flask secret key
+    secret = current_app.secret_key
+    if isinstance(secret, str):
+        secret = secret.encode()
 
-# --- Decorator for LDAP Connection ---
+    # Ensure it's exactly 32 bytes, then base64 encode it
+    derived_key = base64.urlsafe_b64encode(secret[:32].ljust(32, b'\0'))
+    return derived_key
+
+# Modified decorator
 def ldap_connection_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        session_id = session.get('session_id')
-        if not session_id:
-            flash("No active session. Please log in again.", "danger")
-            return redirect(url_for('main.login'))
-
-        connection = get_ldap_connection(session_id)
-
-        if not connection:
+        conn_info = get_ldap_connection()
+        if not conn_info:
             flash("No active LDAP connection. Please log in again.", "danger")
             return redirect(url_for('main.login'))
-
-        if not connection.bound:
-            flash("LDAP connection was lost. Please log in again.", "warning")
-            remove_ldap_connection(session_id)
+        
+        try:
+            # Decrypt password
+            fernet = Fernet(get_fernet_key())
+            password = fernet.decrypt(conn_info['encrypted_password'].encode()).decode()
+        except Exception as e:
+            current_app.logger.error(f"Password decryption failed: {str(e)}")
+            flash("Session expired. Please log in again.", "danger")
             return redirect(url_for('main.login'))
-
-        g.ldap_conn = connection  # Store the active connection in Flask's request context 'g'
+        
+        # Re-establish connection
+        is_connected, connection = co.connect_to_active_directory(
+            conn_info['ldap_server'],
+            conn_info['login'],
+            password,
+            conn_info['domain']
+        )
+        
+        if not is_connected:
+            flash("LDAP connection failed. Please log in again.", "danger")
+            return redirect(url_for('main.login'))
+        
+        g.ldap_conn = connection
         return f(*args, **kwargs)
-
+    
     return decorated_function
 
+# --- Modified Login Route ---
+@main_routes.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        ldap_server_form = request.form['ldap_server']
+        login_form = request.form['login']
+        password_form = request.form['password']
+        domain_form = request.form['domain']
+
+        # Test connection
+        is_connected, _ = co.connect_to_active_directory(
+            ldap_server_form, 
+            login_form, 
+            password_form, 
+            domain_form
+        )
+
+        if is_connected:
+            # Store session info without persisting password
+            session['session_id'] = str(uuid.uuid4())
+            session['login'] = login_form
+            session['ldap_server'] = ldap_server_form
+            session['domain'] = domain_form
+            session.setdefault('columns', ["name", "distinguishedName"])
+            session.setdefault('options', [])
+            
+            fernet = Fernet(get_fernet_key())
+            encrypted_pw = fernet.encrypt(password_form.encode()).decode()
+            
+            set_ldap_connection(
+                ldap_server_form, 
+                login_form, 
+                encrypted_pw,  # Store encrypted password
+                domain_form
+            )
+            
+            # Store password temporarily for first request only
+            session['temp_password'] = password_form
+            
+            flash('Login successful!', 'success')
+            return redirect(url_for('main.index'))
+        else:
+            flash_error("Login failed. Please check your credentials and server details.")
+            return render_template('login.html')
+    return render_template('login.html')
 
 # --- Helper Functions ---
 def flash_error(message):
@@ -250,47 +343,19 @@ def checkbox_form():
     )
 
 
-@main_routes.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        ldap_server_form = request.form['ldap_server']
-        login_form = request.form['login']
-        password_form = request.form['password']
-        domain_form = request.form['domain']
-
-        is_connected, connection_obj = co.connect_to_active_directory(ldap_server_form, login_form, password_form,
-                                                                      domain_form)
-        if is_connected:
-            session_id = str(uuid.uuid4())
-            session['session_id'] = session_id
-            session['login'] = login_form
-            session['ldap_server'] = ldap_server_form
-            session['domain'] = domain_form
-            session.setdefault('columns', ["name", "distinguishedName"])
-            session.setdefault('options', [])
-
-            set_ldap_connection(session_id, connection_obj)
-            flash('Login successful!', 'success')
-            return redirect(url_for('main.index'))
-        else:
-            flash_error("Login failed. Please check your credentials and server details.")
-            return render_template('login.html')
-    return render_template('login.html')
-
 
 @main_routes.route('/logout')
 def logout():
-    session_id = session.pop('session_id', None)
-    if session_id:
-        remove_ldap_connection(session_id)
-
-    keys_to_pop = ['login', 'ldap_server', 'domain', 'columns', 'options', 'import_file', 'role']
+    remove_ldap_connection()
+    keys_to_pop = [
+        'session_id', 'login', 'ldap_server', 'domain', 
+        'columns', 'options', 'import_file', 'role'
+    ]
     for key in keys_to_pop:
         session.pop(key, None)
-
+    
     flash('You have been logged out.', 'info')
     return redirect(url_for('main.login'))
-
 
 @main_routes.route('/delete_user', methods=['GET', 'POST'])
 @ldap_connection_required
